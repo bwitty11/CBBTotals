@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBB Totals Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12151a;
+    --panel: #1a1e26;
+    --panel-2: #20252f;
+    --line: #2b313d;
+    --text: #e9e7e1;
+    --dim: #9099a8;
+    --accent: #f2a93b;
+    --accent-dim: #7a5b23;
+    --over: #48b57e;
+    --over-dim: #1e3b2c;
+    --under: #e0645c;
+    --under-dim: #452321;
+    --lean-over: #2f4d3d;
+    --lean-under: #4a2f2c;
+    --display: 'Oswald', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.5;
+    padding-bottom: 60px;
+  }
+
+  header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #171b22 0%, var(--bg) 100%);
+  }
+
+  header h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    margin: 0;
+    color: var(--text);
+  }
+  header h1 span { color: var(--accent); }
+
+  header p {
+    margin: 6px 0 0;
+    color: var(--dim);
+    font-size: 13px;
+  }
+
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px 20px;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .panel-head h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .panel-head .sub { color: var(--dim); font-size: 12px; }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #1a1400; border-color: var(--accent); }
+  .btn.primary:hover { color: #1a1400; filter: brightness(1.08); }
+  .btn.small { padding: 4px 8px; font-size: 11px; }
+  .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  input[type=file] { display: none; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--display);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    color: var(--dim);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+
+  td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #20242c;
+    white-space: nowrap;
+  }
+
+  tbody tr:hover td { background: #1e232c; }
+
+  td input, td select {
+    width: 100%;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 3px 5px;
+  }
+  td input:hover, td select:hover { border-color: var(--line); }
+  td input:focus, td select:focus { border-color: var(--accent); background: #12151a; }
+  td input[type=number] { text-align: right; }
+
+  .row-actions { text-align: center; width: 28px; }
+  .del-btn {
+    background: none; border: none; color: var(--dim); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 2px 4px;
+  }
+  .del-btn:hover { color: var(--under); }
+
+  table-wrap, .table-scroll { overflow-x: auto; }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px 18px;
+  }
+  .field label {
+    display: block;
+    font-size: 10.5px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 7px 9px;
+    border-radius: 4px;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .add-row-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    align-items: flex-end;
+  }
+  .add-row-form .field { flex: 1; min-width: 100px; }
+  .add-row-form .field input { padding: 6px 8px; font-size: 12.5px; }
+
+  .signal-cell {
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 3px 8px !important;
+    text-align: center;
+  }
+  .sig-strong-over  { background: var(--over-dim); color: var(--over); }
+  .sig-lean-over    { background: var(--lean-over); color: #8fd6ab; }
+  .sig-strong-under { background: var(--under-dim); color: var(--under); }
+  .sig-lean-under   { background: var(--lean-under); color: #e5978f; }
+  .sig-no-edge      { background: #262b34; color: var(--dim); }
+  .sig-flag         { background: #2c2410; color: var(--accent); }
+
+  .hit-badge { font-weight: 600; border-radius: 3px; padding: 2px 7px; font-size: 11.5px; }
+  .hit-yes  { background: var(--over-dim); color: var(--over); }
+  .hit-no   { background: var(--under-dim); color: var(--under); }
+  .hit-push { background: #262b34; color: var(--dim); }
+
+  .stat-block { display: flex; flex-direction: column; }
+  .stat-block .num { font-family: var(--display); font-size: 20px; color: var(--text); }
+  .stat-block .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); }
+
+  .zbar-track { width: 90px; height: 10px; background: #262b34; border-radius: 5px; position: relative; overflow: hidden; }
+  .zbar-fill { position: absolute; top: 0; bottom: 0; }
+  .zbar-fill.over { background: var(--over); left: 50%; }
+  .zbar-fill.under { background: var(--under); right: 50%; }
+  .zbar-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #444b58; }
+
+  .empty-msg { color: var(--dim); font-style: italic; padding: 10px 4px; font-size: 12.5px; }
+
+  details.instructions {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 20px;
+  }
+  details.instructions summary {
+    cursor: pointer;
+    font-family: var(--display);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  details.instructions .body { margin-top: 12px; color: var(--dim); font-size: 12.5px; }
+  details.instructions .body p { margin: 0 0 10px; }
+  details.instructions code { color: var(--text); background: var(--panel-2); padding: 1px 4px; border-radius: 3px; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--accent); color: var(--text);
+    padding: 9px 16px; border-radius: 5px; font-size: 12.5px;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+    z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+
+  .ticker {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .tab-nav {
+    display: flex;
+    gap: 4px;
+    max-width: 1180px;
+    margin: 16px auto 0;
+    padding: 0 24px;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 12.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 9px 18px;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); background: var(--panel); border-color: var(--line); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 20px; }
+
+  @media (max-width: 640px) {
+    header { padding: 20px 16px; }
+    main { padding: 16px; }
+    section.panel { padding: 14px; }
+    .tab-nav { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CBB Totals <span>Model</span></h1>
+  <p style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+    <span class="ticker" id="dateTimeTicker"></span>
+    <button class="btn small" id="exportAllBtn" title="Download everything (teams, games, settings, backtest log) as one file">Export All Data</button>
+    <label class="btn small" for="importAllInput" title="Load a file saved with Export All Data">Import All Data</label>
+    <input type="file" id="importAllInput" accept="application/json">
+    <button class="btn small" id="resetStateBtn" title="Clear saved data and reload with sample data">Reset to Sample Data</button>
+  </p>
+  <div id="storageBanner" style="display:none; margin-top:10px; padding:8px 12px; background:#2c2410; border:1px solid var(--accent-dim); border-radius:4px; color:var(--accent); font-size:12.5px;"></div>
+</header>
+
+<nav class="tab-nav">
+  <button class="tab-btn" data-tab="settings">Settings</button>
+  <button class="tab-btn" data-tab="teams">Team Stats</button>
+  <button class="tab-btn" data-tab="games">Daily Games &amp; Output</button>
+  <button class="tab-btn" data-tab="backtest">Backtest Log</button>
+</nav>
+
+<main>
+
+  <div class="tab-panel" data-tab="settings">
+    <section class="panel" id="settingsPanel">
+      <div class="panel-head">
+        <h2>Settings</h2>
+        <label class="sub" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="autoCalcLgToggle" style="cursor:pointer;">
+          Auto-calculate League Avg fields from Team Stats
+        </label>
+      </div>
+      <div class="settings-grid" id="settingsGrid"></div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-tab="teams">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Team Stats</h2>
+        <div style="display:flex; gap:8px;">
+          <label class="btn small" for="teamCsvInput">Upload CSV</label>
+          <input type="file" id="teamCsvInput" accept=".csv">
+          <button class="btn small" id="downloadTeamsBtn">Download CSV</button>
+          <button class="btn small" id="addTeamBtn">+ Add Team</button>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:10px; color:var(--dim);">
+        Columns: Team, AdjTempo, AdjOE, AdjDE, EFGOff, EFGDef, FTROff, FTRDef, TOVOff, TOVDef, ORBOff, ORBDef — eFG% and FT Rate are entered as numbers like 54.5 (not 0.545), same style as TOV/ORB rate.
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <input type="text" id="teamSearchInput" placeholder="Search teams…" style="flex:1; max-width:260px; background:var(--panel-2); border:1px solid var(--line); color:var(--text); font-family:var(--mono); font-size:12.5px; padding:7px 9px; border-radius:4px;">
+        <span class="sub" id="teamCountLabel" style="color:var(--dim);"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="teamsTable">
+          <thead><tr>
+            <th>Team</th><th>AdjTempo</th><th>AdjOE</th><th>AdjDE</th>
+            <th>eFG Off</th><th>eFG Def</th><th>FTR Off</th><th>FTR Def</th><th>TOV Off</th><th>TOV Def</th>
+            <th>ORB Off</th><th>ORB Def</th><th></th>
+          </tr></thead>
+          <tbody id="teamsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-tab="games">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Games</h2>
+        <div style="display:flex; gap:8px;">
+          <label class="btn small" for="gamesCsvInput">Upload CSV</label>
+          <input type="file" id="gamesCsvInput" accept=".csv">
+          <button class="btn small" id="downloadGamesBtn">Download CSV</button>
+          <button class="btn small" id="clearGamesBtn">Clear Games</button>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:10px; color:var(--dim);">
+        Columns: Date, Home, Away, MarketTotal — team names must match the Team Stats table (not case-sensitive)
+      </div>
+      <div class="table-scroll">
+        <table id="gamesTable">
+          <thead><tr><th>Date</th><th>Home</th><th>Away</th><th>Market Total</th><th></th></tr></thead>
+          <tbody id="gamesBody"></tbody>
+        </table>
+      </div>
+      <div class="add-row-form">
+        <div class="field"><label>Date</label><input type="text" id="newDate" placeholder="2026-01-15"></div>
+        <div class="field"><label>Home</label><input type="text" id="newHome" list="teamNames" placeholder="Home team"></div>
+        <div class="field"><label>Away</label><input type="text" id="newAway" list="teamNames" placeholder="Away team"></div>
+        <div class="field"><label>Market Total</label><input type="number" step="any" inputmode="decimal" id="newMarket" placeholder="152.5"></div>
+        <button class="btn primary" id="addGameBtn">+ Add Game</button>
+      </div>
+      <datalist id="teamNames"></datalist>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Model Output</h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label class="sub" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="autoSortToggle" style="cursor:pointer;" checked>
+            Auto-sort by strongest signal
+          </label>
+          <button class="btn small" id="downloadResultsBtn">Download Results CSV</button>
+          <button class="btn primary small" id="logTodayBtn" title="Saves today's computed games into the Backtest log below, and downloads a dated CSV">Log &amp; Download Today's Results</button>
+        </div>
+      </div>
+      <div class="sub" style="margin-bottom:10px; color:var(--dim);" id="sortHint">
+        Sorted strongest edge first (Strong → Lean → No Edge → flagged). Click a column header to sort manually, or toggle auto-sort back on above.
+      </div>
+      <div class="table-scroll">
+        <table id="resultsTable">
+          <thead><tr>
+            <th data-sort="Date">Date</th><th data-sort="Home">Home</th><th data-sort="Away">Away</th>
+            <th class="sortable" data-sort="MarketTotal">Market</th><th class="sortable" data-sort="ModelTotal">Model</th>
+            <th class="sortable" data-sort="HomePts">Home Pts</th><th class="sortable" data-sort="AwayPts">Away Pts</th>
+            <th class="sortable" data-sort="Edge">Edge</th><th class="sortable" data-sort="ZScore">Z</th>
+            <th class="sortable" data-sort="FFAdjustment">FF Adj</th>
+            <th class="sortable" data-sort="Signal">Signal</th><th>Z-Bar</th>
+          </tr></thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-tab="backtest">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Backtest Log</h2>
+        <div style="display:flex; gap:8px;">
+          <button class="btn small" id="downloadHistoryBtn">Download History CSV</button>
+          <button class="btn small" id="applyStdDevBtn" title="Sets Settings → Std Dev of Model Error from the completed games below">Apply Std Dev to Settings</button>
+          <button class="btn small" id="clearStatsBtn" title="Clears Actual Total / stats from every logged game, but keeps the games themselves in the log">Clear Stats</button>
+          <button class="btn small" id="clearHistoryBtn" title="Removes every game from the log entirely">Clear Log</button>
+        </div>
+      </div>
+      <div id="backtestStats" style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px; color:var(--dim);"></div>
+      <div class="table-scroll">
+        <table id="historyTable">
+          <thead><tr>
+            <th>Date</th><th>Home</th><th>Away</th><th>Market</th><th>Model</th>
+            <th>Edge</th><th>Signal</th><th>Actual Total</th><th>Model Error</th><th>Signal Hit</th><th></th>
+          </tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================================================================
+// STATE — kept entirely in memory for this browser tab (no storage)
+// =====================================================================
+let teams = [
+  { Team: "Duke", AdjTempo: 70.5, AdjOE: 118.2, AdjDE: 92.1, EFGOff: 54.5, EFGDef: 46.5, FTROff: 34.0, FTRDef: 30.0, TOVOff: 16.0, TOVDef: 19.5, ORBOff: 30.5, ORBDef: 25.0 },
+  { Team: "North Carolina", AdjTempo: 71.8, AdjOE: 116.5, AdjDE: 96.4, EFGOff: 52.5, EFGDef: 49.5, FTROff: 31.0, FTRDef: 33.0, TOVOff: 17.5, TOVDef: 18.0, ORBOff: 33.0, ORBDef: 27.5 },
+  { Team: "Gonzaga", AdjTempo: 72.0, AdjOE: 119.8, AdjDE: 97.0, EFGOff: 55.5, EFGDef: 50.0, FTROff: 36.0, FTRDef: 29.0, TOVOff: 15.5, TOVDef: 20.0, ORBOff: 31.0, ORBDef: 24.0 },
+  { Team: "Houston", AdjTempo: 64.2, AdjOE: 112.0, AdjDE: 87.5, EFGOff: 50.0, EFGDef: 45.0, FTROff: 29.0, FTRDef: 27.0, TOVOff: 14.5, TOVDef: 22.5, ORBOff: 34.5, ORBDef: 22.5 }
+];
+
+let games = [
+  { Date: "2026-01-15", Home: "Duke", Away: "North Carolina", MarketTotal: 152.5 },
+  { Date: "2026-01-16", Home: "Gonzaga", Away: "Houston", MarketTotal: 138.0 }
+];
+
+// Backtest log: each entry is a snapshot of a computed game plus an optional
+// ActualTotal filled in once the game is final. Persisted across sessions.
+let history = [];
+
+const TEAM_FIELDS = ["Team","AdjTempo","AdjOE","AdjDE","EFGOff","EFGDef","FTROff","FTRDef","TOVOff","TOVDef","ORBOff","ORBDef"];
+const TEAM_NUMERIC = TEAM_FIELDS.slice(1);
+
+const settingsDefs = [
+  { key: "lgTempo", label: "League Avg Tempo (poss/40)", value: 68.0, autoCalc: true },
+  { key: "lgEff", label: "League Avg Efficiency (pts/100)", value: 104.0, autoCalc: true },
+  { key: "stdDevErr", label: "Std Dev of Model Error", value: 9.0 },
+  { key: "leanThresh", label: "Edge Threshold — Lean", value: 2.0 },
+  { key: "strongThresh", label: "Edge Threshold — Strong", value: 4.0 },
+  { key: "lgEFG", label: "League Avg eFG%", value: 50.5, autoCalc: true },
+  { key: "lgFTR", label: "League Avg FT Rate (%)", value: 32.0, autoCalc: true },
+  { key: "lgTOV", label: "League Avg TOV Rate (%)", value: 17.5, autoCalc: true },
+  { key: "lgORB", label: "League Avg ORB Rate (%)", value: 28.0, autoCalc: true },
+  { key: "wEFG", label: "Weight — eFG%", value: 0.30 },
+  { key: "wTOV", label: "Weight — Turnover Rate", value: 0.30 },
+  { key: "wORB", label: "Weight — Off Rebound Rate", value: 0.25 },
+  { key: "wFTR", label: "Weight — FT Rate", value: 0.15 },
+  { key: "sens", label: "Four-Factor Sensitivity (0-1)", value: 0.40 }
+];
+let settings = {};
+settingsDefs.forEach(d => settings[d.key] = d.value);
+
+// When true, the League Avg settings above are computed live from whatever's
+// currently in the Team Stats table instead of being manually typed.
+let autoCalcLg = true;
+
+// Results-table sort state. When autoSortResults is true, results are ranked
+// by signal strength (Strong > Lean > No Edge > flagged) and, within a tier,
+// by absolute edge/z-score descending — the "best calls float to the top"
+// behavior. Turning it off (or clicking a column header) switches to manual
+// column sorting via sortKey/sortDir.
+let autoSortResults = true;
+let sortKey = null;
+let sortDir = "desc";
+
+// =====================================================================
+// PERSISTENCE
+//
+// Two backends, chosen automatically:
+//
+// 1) CLOUD (preferred) — when this page is running as a Claude artifact,
+//    `window.storage` is available and is tied to your Claude account,
+//    not this browser/device. Save here and the same data shows up when
+//    you open this artifact anywhere else. This is what makes "use it on
+//    a different laptop" work with zero manual steps.
+//
+// 2) LOCAL FALLBACK — if this file is saved and opened directly in a
+//    plain browser tab (outside Claude), window.storage doesn't exist,
+//    so we fall back to this browser's localStorage. That only persists
+//    on this one device/browser — use Export/Import All Data to move
+//    data between devices in that case.
+// =====================================================================
+const STORAGE_KEY = "cbb_totals_model_state_v2";
+const CLOUD_KEY = "state";
+let usingCloudStorage = (typeof window !== "undefined" && !!window.storage);
+let storageAvailable = true; // only meaningful for the localStorage fallback
+
+function testStorageAvailable() {
+  try {
+    const t = "__cbb_test__";
+    localStorage.setItem(t, "1");
+    localStorage.removeItem(t);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function currentSnapshot() {
+  return { teams, games, settings, history, autoCalcLg, autoSortResults };
+}
+
+async function saveState() {
+  const payload = JSON.stringify(currentSnapshot());
+  if (usingCloudStorage) {
+    try {
+      const result = await window.storage.set(CLOUD_KEY, payload, false);
+      if (!result) showStorageBanner("Couldn't reach Claude's storage just now — your latest edit may not have saved. It'll retry on your next change.");
+      else hideStorageBanner();
+    } catch (e) {
+      showStorageBanner("Couldn't reach Claude's storage just now — your latest edit may not have saved. It'll retry on your next change.");
+    }
+    return;
+  }
+  if (!storageAvailable) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, payload);
+  } catch (e) {
+    storageAvailable = false;
+    showStorageBanner("This browser is blocking local storage, so edits won't be remembered after you close this tab. Use Export All Data before closing if you want to keep them.");
+  }
+}
+
+function applySnapshot(data) {
+  if (Array.isArray(data.teams) && data.teams.length) teams = data.teams;
+  if (Array.isArray(data.games)) games = data.games;
+  if (Array.isArray(data.history)) history = data.history;
+  if (typeof data.autoCalcLg === "boolean") autoCalcLg = data.autoCalcLg;
+  if (typeof data.autoSortResults === "boolean") autoSortResults = data.autoSortResults;
+  if (data.settings && typeof data.settings === "object") {
+    settingsDefs.forEach(d => {
+      if (data.settings[d.key] !== undefined && !isNaN(parseFloat(data.settings[d.key]))) {
+        settings[d.key] = parseFloat(data.settings[d.key]);
+      }
+    });
+  }
+}
+
+async function loadState() {
+  if (usingCloudStorage) {
+    try {
+      const result = await window.storage.get(CLOUD_KEY, false);
+      if (!result || !result.value) return false;
+      applySnapshot(JSON.parse(result.value));
+      return true;
+    } catch (e) {
+      // No saved data yet for this account, or a transient error — either
+      // way, start from the sample data rather than blocking the page.
+      return false;
+    }
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    applySnapshot(JSON.parse(raw));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function showStorageBanner(msg) {
+  const b = document.getElementById("storageBanner");
+  if (!b) return;
+  b.textContent = msg;
+  b.style.display = "block";
+}
+
+function hideStorageBanner() {
+  const b = document.getElementById("storageBanner");
+  if (b) b.style.display = "none";
+}
+
+function clearSavedState() {
+  if (usingCloudStorage) {
+    window.storage.delete(CLOUD_KEY, false).catch(() => {}).finally(() => location.reload());
+    return;
+  }
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  location.reload();
+}
+
+// =====================================================================
+// MODEL MATH
+// =====================================================================
+function fourFactorMultiplier(off, def, lgEFG, lgTOV, lgORB, lgFTR, wEFG, wTOV, wORB, wFTR, sens) {
+  let expEFG = (off.EFGOff * def.EFGDef) / lgEFG;
+  let expTOV = (off.TOVOff * def.TOVDef) / lgTOV;
+  let expORB = (off.ORBOff * def.ORBDef) / lgORB;
+  let expFTR = (off.FTROff * def.FTRDef) / lgFTR;
+
+  if (!isFinite(expEFG) || expEFG <= 0) expEFG = lgEFG;
+  if (!isFinite(expTOV) || expTOV <= 0) expTOV = lgTOV;
+  if (!isFinite(expORB) || expORB <= 0) expORB = lgORB;
+  if (!isFinite(expFTR) || expFTR <= 0) expFTR = lgFTR;
+
+  const efgMult = Math.pow(expEFG / lgEFG, wEFG * sens);
+  const tovMult = Math.pow(lgTOV / expTOV, wTOV * sens);
+  const orbMult = Math.pow(expORB / lgORB, wORB * sens);
+  const ftrMult = Math.pow(expFTR / lgFTR, wFTR * sens);
+  return efgMult * tovMult * orbMult * ftrMult;
+}
+
+function round1(x) { return Math.round(x * 10) / 10; }
+
+function computeGame(homeName, awayName, marketTotal, teamsByName, s) {
+  const home = teamsByName[String(homeName).trim().toLowerCase()];
+  const away = teamsByName[String(awayName).trim().toLowerCase()];
+
+  if (!home || !away) {
+    const missing = [];
+    if (!home) missing.push(homeName || "(blank)");
+    if (!away) missing.push(awayName || "(blank)");
+    return { ok: false, flag: true, signal: `Missing: ${missing.join(", ")}` };
+  }
+  if (marketTotal === null || marketTotal === undefined || marketTotal === "" || isNaN(marketTotal)) {
+    return { ok: false, flag: true, signal: "No Market Total" };
+  }
+
+  const expTempo = (home.AdjTempo * away.AdjTempo) / s.lgTempo;
+  const homeExpEff = (home.AdjOE * away.AdjDE) / s.lgEff;
+  const awayExpEff = (away.AdjOE * home.AdjDE) / s.lgEff;
+
+  const homeBasePts = (expTempo / 100) * homeExpEff;
+  const awayBasePts = (expTempo / 100) * awayExpEff;
+  const baseTotal = homeBasePts + awayBasePts;
+
+  const homeMult = fourFactorMultiplier(home, away, s.lgEFG, s.lgTOV, s.lgORB, s.lgFTR, s.wEFG, s.wTOV, s.wORB, s.wFTR, s.sens);
+  const awayMult = fourFactorMultiplier(away, home, s.lgEFG, s.lgTOV, s.lgORB, s.lgFTR, s.wEFG, s.wTOV, s.wORB, s.wFTR, s.sens);
+
+  const homePts = homeBasePts * homeMult;
+  const awayPts = awayBasePts * awayMult;
+  const modelTotal = homePts + awayPts;
+  const ffAdjustment = modelTotal - baseTotal;
+
+  const edge = modelTotal - parseFloat(marketTotal);
+  const zScore = edge / s.stdDevErr;
+
+  let signal;
+  if (Math.abs(edge) >= s.strongThresh) signal = edge > 0 ? "Strong Over" : "Strong Under";
+  else if (Math.abs(edge) >= s.leanThresh) signal = edge > 0 ? "Lean Over" : "Lean Under";
+  else signal = "No Edge";
+
+  return {
+    ok: true,
+    modelTotal: round1(modelTotal), homePts: round1(homePts), awayPts: round1(awayPts),
+    edge: round1(edge), zScore: Math.round(zScore * 100) / 100,
+    ffAdjustment: round1(ffAdjustment), signal
+  };
+}
+
+function teamsIndex() {
+  const idx = {};
+  teams.forEach(t => { if (t.Team) idx[String(t.Team).trim().toLowerCase()] = t; });
+  return idx;
+}
+
+// =====================================================================
+// CSV HELPERS
+// =====================================================================
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return [];
+  const headers = lines[0].split(",").map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const cells = line.split(",").map(c => c.trim().replace(/^"(.*)"$/, "$1"));
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = cells[i] !== undefined ? cells[i] : "");
+    return obj;
+  });
+}
+
+function toCSV(rows, fields) {
+  const lines = [fields.join(",")];
+  rows.forEach(r => {
+    lines.push(fields.map(f => {
+      let v = r[f] === undefined || r[f] === null ? "" : r[f];
+      v = String(v);
+      return v.includes(",") ? `"${v}"` : v;
+    }).join(","));
+  });
+  return lines.join("\n");
+}
+
+function downloadCSV(filename, csvText) {
+  const blob = new Blob([csvText], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// =====================================================================
+// RENDER: Settings
+// =====================================================================
+function renderSettings() {
+  const grid = document.getElementById("settingsGrid");
+  grid.innerHTML = "";
+  settingsDefs.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "field";
+    const isAuto = d.autoCalc && autoCalcLg;
+    const disabledAttr = isAuto ? "disabled" : "";
+    const labelSuffix = d.autoCalc ? (autoCalcLg ? " (auto)" : "") : "";
+    div.innerHTML = `<label>${d.label}${labelSuffix}</label><input type="number" step="any" inputmode="decimal" data-key="${d.key}" value="${settings[d.key]}" ${disabledAttr} style="${isAuto ? 'opacity:0.6; cursor:not-allowed;' : ''}">`;
+    grid.appendChild(div);
+  });
+  grid.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const v = parseFloat(inp.value);
+      settings[inp.dataset.key] = isNaN(v) ? 0 : v;
+      recompute();
+    });
+  });
+
+  const toggle = document.getElementById("autoCalcLgToggle");
+  toggle.checked = autoCalcLg;
+}
+
+// Recomputes the 6 League Avg settings as the mean across all current teams
+// (averaging each factor's Off and Def columns together). Only runs when
+// autoCalcLg is on, and only touches the settings flagged autoCalc: true.
+function recalcLeagueAveragesFromTeams() {
+  if (!autoCalcLg) return;
+  if (teams.length === 0) return;
+
+  const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const col = f => teams.map(t => parseFloat(t[f])).filter(v => !isNaN(v));
+  const meanCol = f => { const c = col(f); return c.length ? mean(c) : null; };
+  const meanPair = (f1, f2) => {
+    const vals = [meanCol(f1), meanCol(f2)].filter(v => v !== null);
+    return vals.length ? mean(vals) : null;
+  };
+
+  const computed = {
+    lgTempo: meanCol("AdjTempo"),
+    lgEff: meanPair("AdjOE", "AdjDE"),
+    lgEFG: meanPair("EFGOff", "EFGDef"),
+    lgFTR: meanPair("FTROff", "FTRDef"),
+    lgTOV: meanPair("TOVOff", "TOVDef"),
+    lgORB: meanPair("ORBOff", "ORBDef"),
+  };
+
+  Object.keys(computed).forEach(key => {
+    if (computed[key] !== null && computed[key] > 0) {
+      settings[key] = Math.round(computed[key] * 100) / 100;
+    }
+  });
+
+  renderSettings();
+}
+
+// =====================================================================
+// RENDER: Team Stats table
+// =====================================================================
+function renderTeamsTable() {
+  const body = document.getElementById("teamsBody");
+  body.innerHTML = "";
+
+  const query = (document.getElementById("teamSearchInput").value || "").trim().toLowerCase();
+  let shown = 0;
+
+  teams.forEach((team, rowIdx) => {
+    if (query && !String(team.Team || "").toLowerCase().includes(query)) return;
+    shown++;
+    const tr = document.createElement("tr");
+    TEAM_FIELDS.forEach(field => {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = TEAM_NUMERIC.includes(field) ? "number" : "text";
+      if (TEAM_NUMERIC.includes(field)) { input.step = "any"; input.inputMode = "decimal"; }
+      input.value = team[field] !== undefined ? team[field] : "";
+      input.addEventListener("input", () => {
+        teams[rowIdx][field] = TEAM_NUMERIC.includes(field) ? parseFloat(input.value) || 0 : input.value;
+        if (field === "Team") updateTeamNamesList();
+        recalcLeagueAveragesFromTeams();
+        recompute();
+      });
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+    const tdDel = document.createElement("td");
+    tdDel.className = "row-actions";
+    tdDel.innerHTML = `<button class="del-btn" title="Remove team">&times;</button>`;
+    tdDel.querySelector("button").addEventListener("click", () => {
+      teams.splice(rowIdx, 1);
+      renderTeamsTable();
+      updateTeamNamesList();
+      recalcLeagueAveragesFromTeams();
+      recompute();
+    });
+    tr.appendChild(tdDel);
+    body.appendChild(tr);
+  });
+
+  if (shown === 0) {
+    body.innerHTML = `<tr><td colspan="13" class="empty-msg">No teams match "${query}".</td></tr>`;
+  }
+
+  const countLabel = document.getElementById("teamCountLabel");
+  countLabel.textContent = query ? `Showing ${shown} of ${teams.length}` : `${teams.length} teams`;
+}
+
+function updateTeamNamesList() {
+  const dl = document.getElementById("teamNames");
+  dl.innerHTML = teams.map(t => `<option value="${(t.Team || "").replace(/"/g, "")}">`).join("");
+}
+
+// =====================================================================
+// RENDER: Games table
+// =====================================================================
+function renderGamesTable() {
+  const body = document.getElementById("gamesBody");
+  body.innerHTML = "";
+  games.forEach((g, rowIdx) => {
+    const tr = document.createElement("tr");
+
+    const mk = (field, type, listAttr) => {
+      const td = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = type;
+      if (type === "number") { input.step = "any"; input.inputMode = "decimal"; }
+      if (listAttr) input.setAttribute("list", listAttr);
+      input.value = g[field] !== undefined ? g[field] : "";
+      input.addEventListener("input", () => {
+        games[rowIdx][field] = type === "number" ? (input.value === "" ? "" : parseFloat(input.value)) : input.value;
+        recompute();
+      });
+      td.appendChild(input);
+      return td;
+    };
+
+    tr.appendChild(mk("Date", "text"));
+    tr.appendChild(mk("Home", "text", "teamNames"));
+    tr.appendChild(mk("Away", "text", "teamNames"));
+    tr.appendChild(mk("MarketTotal", "number"));
+
+    const tdDel = document.createElement("td");
+    tdDel.className = "row-actions";
+    tdDel.innerHTML = `<button class="del-btn" title="Remove game">&times;</button>`;
+    tdDel.querySelector("button").addEventListener("click", () => {
+      games.splice(rowIdx, 1);
+      renderGamesTable();
+      recompute();
+    });
+    tr.appendChild(tdDel);
+
+    body.appendChild(tr);
+  });
+}
+
+// =====================================================================
+// RENDER: Results (recomputed live, this is the only thing that redraws
+// on every keystroke elsewhere in the page)
+// =====================================================================
+function signalClass(signal) {
+  switch (signal) {
+    case "Strong Over": return "sig-strong-over";
+    case "Lean Over": return "sig-lean-over";
+    case "Strong Under": return "sig-strong-under";
+    case "Lean Under": return "sig-lean-under";
+    case "No Edge": return "sig-no-edge";
+    default: return "sig-flag";
+  }
+}
+
+// Signal strength rank used for auto-sort — higher rank floats to the top.
+// Strong calls first, then Lean, then No Edge; flagged/invalid rows sink
+// to the bottom regardless of sort direction.
+function signalRank(signal) {
+  switch (signal) {
+    case "Strong Over":
+    case "Strong Under": return 3;
+    case "Lean Over":
+    case "Lean Under": return 2;
+    case "No Edge": return 1;
+    default: return 0; // flagged / missing team / no market
+  }
+}
+
+function zBarHtml(z) {
+  const clamped = Math.max(-3, Math.min(3, z));
+  const pct = (Math.abs(clamped) / 3) * 50;
+  const cls = z >= 0 ? "over" : "under";
+  const style = z >= 0 ? `width:${pct}%;` : `width:${pct}%;`;
+  return `<div class="zbar-track"><div class="zbar-mid"></div><div class="zbar-fill ${cls}" style="${style}"></div></div>`;
+}
+
+let lastResults = [];
+
+// Sorts an array of {game, res} pairs for display. Auto mode ranks by
+// signal strength first (Strong > Lean > No Edge > flagged), then by
+// |Z-Score| descending as a tiebreaker within a tier. Manual mode sorts
+// by whichever column header was clicked.
+function sortResultRows(rows) {
+  if (autoSortResults) {
+    return rows.slice().sort((a, b) => {
+      const rankDiff = signalRank(b.res.signal) - signalRank(a.res.signal);
+      if (rankDiff !== 0) return rankDiff;
+      const az = a.res.ok ? Math.abs(a.res.zScore) : -1;
+      const bz = b.res.ok ? Math.abs(b.res.zScore) : -1;
+      return bz - az;
+    });
+  }
+  if (!sortKey) return rows;
+  const dirMul = sortDir === "asc" ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const av = sortValueFor(a, sortKey);
+    const bv = sortValueFor(b, sortKey);
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dirMul;
+    return String(av).localeCompare(String(bv)) * dirMul;
+  });
+}
+
+function sortValueFor(row, key) {
+  if (key === "Date" || key === "Home" || key === "Away") return row.game[key] || "";
+  if (!row.res.ok) return key === "Signal" ? row.res.signal : -Infinity;
+  const map = {
+    MarketTotal: parseFloat(row.game.MarketTotal),
+    ModelTotal: row.res.modelTotal, HomePts: row.res.homePts, AwayPts: row.res.awayPts,
+    Edge: row.res.edge, ZScore: row.res.zScore, FFAdjustment: row.res.ffAdjustment,
+    Signal: row.res.signal
+  };
+  return map[key];
+}
+
+function updateSortHeaderUI() {
+  document.querySelectorAll('#resultsTable th[data-sort]').forEach(th => {
+    th.classList.remove("sortable-active");
+    th.textContent = th.textContent.replace(/ [▲▼]$/, "");
+    if (!autoSortResults && th.dataset.sort === sortKey) {
+      th.textContent += sortDir === "asc" ? " ▲" : " ▼";
+    }
+  });
+  const hint = document.getElementById("sortHint");
+  if (autoSortResults) {
+    hint.textContent = "Sorted strongest edge first (Strong → Lean → No Edge → flagged). Click a column header to sort manually, or toggle auto-sort back on above.";
+  } else if (sortKey) {
+    hint.textContent = `Sorted manually by ${sortKey} (${sortDir === "asc" ? "ascending" : "descending"}). Toggle auto-sort above to rank by signal strength again.`;
+  } else {
+    hint.textContent = "Showing games in entry order. Click a column header to sort, or toggle auto-sort above to rank by signal strength.";
+  }
+}
+
+function recompute() {
+  saveState();
+  const idx = teamsIndex();
+  const body = document.getElementById("resultsBody");
+  body.innerHTML = "";
+  lastResults = [];
+
+  if (games.length === 0) {
+    body.innerHTML = `<tr><td colspan="12" class="empty-msg">Add a game above to see model output.</td></tr>`;
+    updateSortHeaderUI();
+    return;
+  }
+
+  const rows = [];
+  games.forEach(g => {
+    if (!g.Home && !g.Away) return;
+    const res = computeGame(g.Home, g.Away, g.MarketTotal, idx, settings);
+    rows.push({ game: g, res });
+    if (res.ok) {
+      lastResults.push({
+        Date: g.Date, Home: g.Home, Away: g.Away, MarketTotal: g.MarketTotal,
+        ModelTotal: res.modelTotal, HomePts: res.homePts, AwayPts: res.awayPts,
+        Edge: res.edge, ZScore: res.zScore, FFAdjustment: res.ffAdjustment, Signal: res.signal
+      });
+    }
+  });
+
+  const sorted = sortResultRows(rows);
+
+  sorted.forEach(({ game: g, res }) => {
+    const tr = document.createElement("tr");
+
+    if (!res.ok) {
+      tr.innerHTML = `
+        <td>${g.Date || ""}</td><td>${g.Home || ""}</td><td>${g.Away || ""}</td>
+        <td>${g.MarketTotal ?? ""}</td>
+        <td colspan="8" class="signal-cell ${signalClass(res.signal)}">${res.signal}</td>`;
+      body.appendChild(tr);
+      return;
+    }
+
+    tr.innerHTML = `
+      <td>${g.Date || ""}</td><td>${g.Home || ""}</td><td>${g.Away || ""}</td>
+      <td>${g.MarketTotal ?? ""}</td>
+      <td>${res.modelTotal}</td><td>${res.homePts}</td><td>${res.awayPts}</td>
+      <td>${res.edge > 0 ? "+" : ""}${res.edge}</td>
+      <td>${res.zScore}</td>
+      <td>${res.ffAdjustment > 0 ? "+" : ""}${res.ffAdjustment}</td>
+      <td class="signal-cell ${signalClass(res.signal)}">${res.signal}</td>
+      <td>${zBarHtml(res.zScore)}</td>`;
+    body.appendChild(tr);
+  });
+
+  if (body.innerHTML === "") {
+    body.innerHTML = `<tr><td colspan="12" class="empty-msg">Add a game above to see model output.</td></tr>`;
+  }
+
+  updateSortHeaderUI();
+}
+
+// =====================================================================
+// BACKTEST LOG
+// =====================================================================
+function historyKey(h) {
+  return [h.Date, h.Home, h.Away].map(v => String(v || "").trim().toLowerCase()).join("|");
+}
+
+function logTodayResults() {
+  if (lastResults.length === 0) {
+    showToast("No computed games to log yet");
+    return;
+  }
+  let added = 0, updated = 0;
+  lastResults.forEach(r => {
+    const key = historyKey(r);
+    const existingIdx = history.findIndex(h => historyKey(h) === key);
+    const entry = Object.assign({ ActualTotal: "" }, r);
+    if (existingIdx >= 0) {
+      entry.ActualTotal = history[existingIdx].ActualTotal; // preserve any actual total already entered
+      history[existingIdx] = entry;
+      updated++;
+    } else {
+      history.push(entry);
+      added++;
+    }
+  });
+  renderHistoryTable();
+  saveState();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  downloadCSV(`model_results_${todayStr}.csv`,
+    toCSV(lastResults, ["Date","Home","Away","MarketTotal","ModelTotal","HomePts","AwayPts","Edge","ZScore","FFAdjustment","Signal"]));
+
+  showToast(`Logged ${added} new, updated ${updated} — CSV downloaded`);
+}
+
+function backtestStats() {
+  const completed = history.filter(h => h.ActualTotal !== "" && h.ActualTotal !== null && h.ActualTotal !== undefined && !isNaN(h.ActualTotal));
+  const n = completed.length;
+  if (n === 0) return { n: 0 };
+
+  const errors = completed.map(h => parseFloat(h.ActualTotal) - h.ModelTotal);
+  const meanError = errors.reduce((a, b) => a + b, 0) / n;
+  let stdDev = null;
+  if (n >= 2) {
+    const variance = errors.reduce((a, b) => a + Math.pow(b - meanError, 2), 0) / (n - 1);
+    stdDev = Math.sqrt(variance);
+  }
+
+  const decided = completed.filter(h => h.Signal === "Strong Over" || h.Signal === "Lean Over" || h.Signal === "Strong Under" || h.Signal === "Lean Under");
+  let hits = 0, pushes = 0;
+  decided.forEach(h => {
+    const actual = parseFloat(h.ActualTotal);
+    const isOverCall = h.Signal.includes("Over");
+    if (actual === parseFloat(h.MarketTotal)) { pushes++; return; }
+    const actualWentOver = actual > parseFloat(h.MarketTotal);
+    if (actualWentOver === isOverCall) hits++;
+  });
+  const decidedCount = decided.length - pushes;
+  const hitRate = decidedCount > 0 ? (hits / decidedCount) * 100 : null;
+
+  return { n, meanError, stdDev, hitRate, decidedCount, hits, pushes };
+}
+
+function renderBacktestStats() {
+  const stats = backtestStats();
+  const el = document.getElementById("backtestStats");
+  if (stats.n === 0) {
+    el.innerHTML = `<div class="stat-block"><span class="num">0</span><span class="lbl">Completed Games — fill in Actual Total below</span></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="stat-block"><span class="num">${stats.n}</span><span class="lbl">Completed Games</span></div>
+    <div class="stat-block"><span class="num">${stats.meanError > 0 ? "+" : ""}${stats.meanError.toFixed(1)}</span><span class="lbl">Mean Error (bias)</span></div>
+    <div class="stat-block"><span class="num">${stats.stdDev !== null ? stats.stdDev.toFixed(1) : "—"}</span><span class="lbl">Std Dev of Error</span></div>
+    <div class="stat-block"><span class="num">${stats.hitRate !== null ? stats.hitRate.toFixed(0) + "%" : "—"}</span><span class="lbl">Signal Hit Rate (${stats.decidedCount || 0} calls)</span></div>
+  `;
+}
+
+function computeErrorAndHit(h) {
+  const hasActual = h.ActualTotal !== "" && h.ActualTotal !== null && h.ActualTotal !== undefined && !isNaN(h.ActualTotal);
+  if (!hasActual) return { errorCell: "—", hitCell: "—" };
+
+  const actual = parseFloat(h.ActualTotal);
+  const err = actual - h.ModelTotal;
+  const errorCell = `${err > 0 ? "+" : ""}${err.toFixed(1)}`;
+  let hitCell;
+  if (actual === parseFloat(h.MarketTotal)) {
+    hitCell = `<span class="hit-badge hit-push">Push</span>`;
+  } else if (h.Signal === "No Edge" || !h.Signal) {
+    hitCell = `<span class="hit-badge hit-push">N/A</span>`;
+  } else {
+    const isOverCall = h.Signal.includes("Over");
+    const wentOver = actual > parseFloat(h.MarketTotal);
+    hitCell = wentOver === isOverCall
+      ? `<span class="hit-badge hit-yes">Hit</span>`
+      : `<span class="hit-badge hit-no">Miss</span>`;
+  }
+  return { errorCell, hitCell };
+}
+
+function renderHistoryTable() {
+  const body = document.getElementById("historyBody");
+  body.innerHTML = "";
+
+  if (history.length === 0) {
+    body.innerHTML = `<tr><td colspan="11" class="empty-msg">Click "Log &amp; Download Today's Results" above to start building your backtest log.</td></tr>`;
+    renderBacktestStats();
+    return;
+  }
+
+  history.forEach((h, idx) => {
+    const tr = document.createElement("tr");
+    const { errorCell, hitCell } = computeErrorAndHit(h);
+
+    tr.innerHTML = `
+      <td>${h.Date || ""}</td><td>${h.Home || ""}</td><td>${h.Away || ""}</td>
+      <td>${h.MarketTotal ?? ""}</td><td>${h.ModelTotal ?? ""}</td>
+      <td>${h.Edge > 0 ? "+" : ""}${h.Edge}</td>
+      <td class="signal-cell ${signalClass(h.Signal)}">${h.Signal || ""}</td>
+      <td></td>
+      <td class="err-cell">${errorCell}</td>
+      <td class="hit-cell">${hitCell}</td>
+      <td class="row-actions"><button class="del-btn" title="Remove from log">&times;</button></td>`;
+
+    const actualTd = tr.children[7];
+    const errTd = tr.querySelector(".err-cell");
+    const hitTd = tr.querySelector(".hit-cell");
+
+    const actualInput = document.createElement("input");
+    actualInput.type = "number";
+    actualInput.step = "any";
+    actualInput.inputMode = "decimal";
+    actualInput.placeholder = "final total";
+    actualInput.value = h.ActualTotal !== undefined && h.ActualTotal !== null ? h.ActualTotal : "";
+    actualInput.addEventListener("input", () => {
+      // Only patch this row's derived cells + the stats bar — never rebuild
+      // the table here, or the input the user is actively typing in gets
+      // destroyed mid-keystroke and loses focus after every character.
+      history[idx].ActualTotal = actualInput.value === "" ? "" : parseFloat(actualInput.value);
+      const { errorCell, hitCell } = computeErrorAndHit(history[idx]);
+      errTd.innerHTML = errorCell;
+      hitTd.innerHTML = hitCell;
+      renderBacktestStats();
+      saveState();
+    });
+    actualTd.appendChild(actualInput);
+
+    tr.querySelector(".del-btn").addEventListener("click", () => {
+      history.splice(idx, 1);
+      renderHistoryTable();
+      saveState();
+    });
+
+    body.appendChild(tr);
+  });
+
+  renderBacktestStats();
+}
+
+function applyStdDevToSettings() {
+  const stats = backtestStats();
+  if (stats.n < 2 || stats.stdDev === null) {
+    showToast("Need at least 2 completed games to compute a std dev");
+    return;
+  }
+  settings.stdDevErr = Math.round(stats.stdDev * 100) / 100;
+  const input = document.querySelector('#settingsGrid input[data-key="stdDevErr"]');
+  if (input) input.value = settings.stdDevErr;
+  recompute();
+  showToast(`Std Dev of Model Error set to ${settings.stdDevErr} from ${stats.n} completed games`);
+}
+// =====================================================================
+// EXPORT / IMPORT ALL DATA — a portable snapshot of everything (teams,
+// games, settings, backtest log, toggles) as one JSON file. This is the
+// way to move your data to this same page opened on a different
+// laptop/desktop, since localStorage never leaves the browser it was
+// saved in.
+// =====================================================================
+function exportAllData() {
+  const snapshot = {
+    _format: "cbb_totals_model_export",
+    _version: 2,
+    exportedAt: new Date().toISOString(),
+    teams, games, settings, history, autoCalcLg, autoSortResults
+  };
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = `cbb_totals_model_data_${dateStr}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Exported all data — move this file to the other device and use Import All Data");
+}
+
+function importAllData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      showToast("That file isn't valid JSON — export a fresh copy and try again");
+      return;
+    }
+    if (!data || typeof data !== "object" || !Array.isArray(data.teams) || !Array.isArray(data.games)) {
+      showToast("That doesn't look like a file from Export All Data");
+      return;
+    }
+    if (!confirm("This replaces everything currently loaded here — teams, games, settings, and backtest log — with the contents of the file. Continue?")) {
+      return;
+    }
+
+    teams = Array.isArray(data.teams) ? data.teams : teams;
+    games = Array.isArray(data.games) ? data.games : games;
+    history = Array.isArray(data.history) ? data.history : [];
+    if (typeof data.autoCalcLg === "boolean") autoCalcLg = data.autoCalcLg;
+    if (typeof data.autoSortResults === "boolean") autoSortResults = data.autoSortResults;
+    if (data.settings && typeof data.settings === "object") {
+      settingsDefs.forEach(d => {
+        if (data.settings[d.key] !== undefined && !isNaN(parseFloat(data.settings[d.key]))) {
+          settings[d.key] = parseFloat(data.settings[d.key]);
+        }
+      });
+    }
+
+    document.getElementById("teamSearchInput").value = "";
+    document.getElementById("autoSortToggle").checked = autoSortResults;
+    renderSettings();
+    renderTeamsTable();
+    updateTeamNamesList();
+    renderGamesTable();
+    renderHistoryTable();
+    recalcLeagueAveragesFromTeams();
+    recompute();
+    saveState();
+    showToast("Imported — all data loaded from file");
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById("exportAllBtn").addEventListener("click", exportAllData);
+document.getElementById("importAllInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) importAllData(file);
+  e.target.value = "";
+});
+
+document.getElementById("teamCsvInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const rows = parseCSV(reader.result);
+    let added = 0, updated = 0, skipped = 0;
+
+    rows.forEach(r => {
+      const name = String(r.Team || r.team || "").trim();
+      if (!name) { skipped++; return; }
+
+      const idx = teams.findIndex(t => String(t.Team || "").trim().toLowerCase() === name.toLowerCase());
+
+      if (idx >= 0) {
+        // Existing team: only overwrite fields this CSV row actually provides,
+        // so a partial update (e.g. just efficiency, no four factors yet) doesn't
+        // zero out stats the row didn't include.
+        TEAM_NUMERIC.forEach(f => {
+          if (r[f] !== undefined && r[f] !== "" && !isNaN(parseFloat(r[f]))) {
+            teams[idx][f] = parseFloat(r[f]);
+          }
+        });
+        updated++;
+      } else {
+        // New team: fill any missing/invalid numeric field with 0 rather than skip it.
+        const obj = { Team: name };
+        TEAM_NUMERIC.forEach(f => {
+          obj[f] = (r[f] !== undefined && r[f] !== "" && !isNaN(parseFloat(r[f]))) ? parseFloat(r[f]) : 0;
+        });
+        teams.push(obj);
+        added++;
+      }
+    });
+
+    document.getElementById("teamSearchInput").value = "";
+    renderTeamsTable();
+    updateTeamNamesList();
+    recalcLeagueAveragesFromTeams();
+    recompute();
+    const skipMsg = skipped > 0 ? `, skipped ${skipped} row(s) with no team name` : "";
+    showToast(`Updated ${updated} team(s), added ${added} new${skipMsg}`);
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+document.getElementById("gamesCsvInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const rows = parseCSV(reader.result);
+    games = rows.map(r => ({
+      Date: r.Date || r.date || "",
+      Home: r.Home || r.home || "",
+      Away: r.Away || r.away || "",
+      MarketTotal: parseFloat(r.MarketTotal || r.marketTotal || r.market_total) || ""
+    }));
+    renderGamesTable();
+    recompute();
+    showToast(`Imported ${games.length} games`);
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+document.getElementById("addTeamBtn").addEventListener("click", () => {
+  teams.push({ Team: "New Team", AdjTempo: 68, AdjOE: 104, AdjDE: 104, EFGOff: 50.5, EFGDef: 50.5, FTROff: 32.0, FTRDef: 32.0, TOVOff: 17.5, TOVDef: 17.5, ORBOff: 28, ORBDef: 28 });
+  document.getElementById("teamSearchInput").value = ""; // show the new row even if a search was active
+  renderTeamsTable();
+  updateTeamNamesList();
+  recalcLeagueAveragesFromTeams();
+  recompute();
+});
+
+document.getElementById("teamSearchInput").addEventListener("input", () => {
+  renderTeamsTable(); // only rebuilds #teamsBody — the search box itself is untouched, so it keeps focus
+});
+
+document.getElementById("clearGamesBtn").addEventListener("click", () => {
+  if (games.length === 0) return;
+  if (confirm(`Remove all ${games.length} games from the Games table? This can't be undone (your Backtest Log is separate and won't be affected).`)) {
+    games = [];
+    renderGamesTable();
+    recompute();
+  }
+});
+
+document.getElementById("addGameBtn").addEventListener("click", () => {
+  const date = document.getElementById("newDate").value.trim();
+  const home = document.getElementById("newHome").value.trim();
+  const away = document.getElementById("newAway").value.trim();
+  const market = document.getElementById("newMarket").value.trim();
+  if (!home || !away) { showToast("Enter a home and away team"); return; }
+  games.push({ Date: date, Home: home, Away: away, MarketTotal: market === "" ? "" : parseFloat(market) });
+  ["newDate","newHome","newAway","newMarket"].forEach(id => document.getElementById(id).value = "");
+  renderGamesTable();
+  recompute();
+});
+
+document.getElementById("downloadTeamsBtn").addEventListener("click", () => {
+  downloadCSV("team_stats.csv", toCSV(teams, TEAM_FIELDS));
+});
+document.getElementById("downloadGamesBtn").addEventListener("click", () => {
+  downloadCSV("games.csv", toCSV(games, ["Date","Home","Away","MarketTotal"]));
+});
+document.getElementById("downloadResultsBtn").addEventListener("click", () => {
+  if (lastResults.length === 0) { showToast("No results to export yet"); return; }
+  downloadCSV("model_results.csv", toCSV(lastResults, ["Date","Home","Away","MarketTotal","ModelTotal","HomePts","AwayPts","Edge","ZScore","FFAdjustment","Signal"]));
+});
+
+document.getElementById("logTodayBtn").addEventListener("click", logTodayResults);
+
+document.getElementById("downloadHistoryBtn").addEventListener("click", () => {
+  if (history.length === 0) { showToast("No backtest history to export yet"); return; }
+  downloadCSV("backtest_history.csv", toCSV(history, ["Date","Home","Away","MarketTotal","ModelTotal","HomePts","AwayPts","Edge","ZScore","FFAdjustment","Signal","ActualTotal"]));
+});
+
+document.getElementById("applyStdDevBtn").addEventListener("click", applyStdDevToSettings);
+
+document.getElementById("clearHistoryBtn").addEventListener("click", () => {
+  if (history.length === 0) return;
+  if (confirm(`Remove all ${history.length} logged games from the backtest log? This can't be undone.`)) {
+    history = [];
+    renderHistoryTable();
+    saveState();
+  }
+});
+
+document.getElementById("clearStatsBtn").addEventListener("click", () => {
+  const completedCount = history.filter(h => h.ActualTotal !== "" && h.ActualTotal !== null && h.ActualTotal !== undefined && !isNaN(h.ActualTotal)).length;
+  if (completedCount === 0) { showToast("No completed-game stats to clear"); return; }
+  if (confirm(`Clear Actual Total / stats from ${completedCount} completed game(s)? The ${history.length} logged game(s) themselves stay in the log — only the results/stats reset.`)) {
+    history.forEach(h => { h.ActualTotal = ""; });
+    renderHistoryTable();
+    saveState();
+    showToast("Stats cleared — logged games kept");
+  }
+});
+
+document.getElementById("autoSortToggle").addEventListener("change", (e) => {
+  autoSortResults = e.target.checked;
+  saveState();
+  recompute();
+});
+
+document.querySelectorAll('#resultsTable th[data-sort]').forEach(th => {
+  th.classList.add("sortable");
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (autoSortResults) {
+      // First click on a header while auto-sort is on switches to manual mode.
+      autoSortResults = false;
+      document.getElementById("autoSortToggle").checked = false;
+      sortKey = key;
+      sortDir = "desc";
+    } else if (sortKey === key) {
+      sortDir = sortDir === "desc" ? "asc" : "desc";
+    } else {
+      sortKey = key;
+      sortDir = "desc";
+    }
+    saveState();
+    recompute();
+  });
+});
+
+// =====================================================================
+// TABS
+// =====================================================================
+function switchTab(tabName) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.dataset.tab === tabName));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// =====================================================================
+// DATE/TIME TICKER — updates every second
+// =====================================================================
+function tickClock() {
+  const el = document.getElementById("dateTimeTicker");
+  if (!el) return;
+  const now = new Date();
+  const datePart = now.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const timePart = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  el.textContent = `${datePart} — ${timePart}`;
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.getElementById("resetStateBtn").addEventListener("click", () => {
+  if (confirm("This clears your saved teams, games, and settings in this browser and reloads the sample data. Continue?")) {
+    clearSavedState();
+  }
+});
+
+document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
+  autoCalcLg = e.target.checked;
+  if (autoCalcLg) recalcLeagueAveragesFromTeams();
+  renderSettings();
+  saveState();
+  showToast(autoCalcLg ? "League averages now auto-calculated from Team Stats" : "League averages unlocked for manual editing");
+});
+
+(async function init() {
+  tickClock();
+  setInterval(tickClock, 1000);
+  switchTab("games");
+
+  if (!usingCloudStorage) {
+    storageAvailable = testStorageAvailable();
+    if (!storageAvailable) {
+      showStorageBanner("This browser is blocking local storage, so edits won't be remembered after you close this tab. Use Export All Data before closing if you want to keep them.");
+    }
+  }
+  await loadState();
+
+  document.getElementById("autoSortToggle").checked = autoSortResults;
+  renderSettings();
+  renderTeamsTable();
+  updateTeamNamesList();
+  renderGamesTable();
+  renderHistoryTable();
+  recalcLeagueAveragesFromTeams();
+  recompute();
+})();
+</script>
+</body>
+</html>
