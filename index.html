@@ -339,6 +339,34 @@
   .confirm-box p { margin: 0 0 16px; color: var(--text); font-size: 13.5px; line-height: 1.5; }
   .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
+  .auth-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .auth-overlay.show { display: flex; }
+  .auth-box {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 32px 36px; max-width: 380px; width: 90%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  .auth-box h1 { font-family: var(--display); font-weight: 700; font-size: 22px; margin: 0 0 6px; color: var(--text); text-align: center; }
+  .auth-box h1 span { color: var(--accent); }
+  .auth-box .auth-sub { color: var(--dim); font-size: 12.5px; line-height: 1.5; margin: 0 0 18px; text-align: center; }
+  .auth-box .field { margin-bottom: 12px; }
+  .auth-box .field label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--dim); margin-bottom: 4px; }
+  .auth-box .field input {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    font-family: var(--mono); font-size: 13px; padding: 8px 10px; border-radius: 4px;
+  }
+  .auth-box .field input:focus { border-color: var(--accent); outline: none; }
+  .auth-box .auth-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .auth-box .auth-actions .btn { flex: 1; }
+  .auth-error { color: var(--under); font-size: 12px; margin-top: 10px; min-height: 14px; }
+
   .theme-switch {
     display: inline-flex;
     border: 1px solid var(--line);
@@ -450,6 +478,42 @@
 </head>
 <body>
 
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <h1>Brady's Total <span>Model</span></h1>
+
+    <div id="authSetupForm" style="display:none;">
+      <p class="auth-sub">First time here — set up a username and password. You'll be asked for these every time this page loads, on any device.</p>
+      <div class="field"><label>Username</label><input type="text" id="authNewUsername" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="authNewPassword" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm Password</label><input type="password" id="authNewPassword2" autocomplete="new-password"></div>
+      <button class="btn primary" id="authSetupBtn" style="width:100%;">Create Login</button>
+      <p class="auth-error" id="authSetupError"></p>
+    </div>
+
+    <div id="authLoginForm" style="display:none;">
+      <p class="auth-sub">Enter your username and password to continue.</p>
+      <div class="field"><label>Username</label><input type="text" id="authUsername" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>
+      <button class="btn primary" id="authLoginBtn" style="width:100%;">Log In</button>
+      <p class="auth-error" id="authLoginError"></p>
+    </div>
+
+    <div id="authChangeForm" style="display:none;">
+      <p class="auth-sub">Change your username or password.</p>
+      <div class="field"><label>Current Password</label><input type="password" id="authChangeCurrent" autocomplete="current-password"></div>
+      <div class="field"><label>Username</label><input type="text" id="authChangeUsername" autocomplete="username"></div>
+      <div class="field"><label>New Password</label><input type="password" id="authChangeNew" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm New Password</label><input type="password" id="authChangeNew2" autocomplete="new-password"></div>
+      <div class="auth-actions">
+        <button class="btn" id="authChangeCancelBtn">Cancel</button>
+        <button class="btn primary" id="authChangeSaveBtn">Save</button>
+      </div>
+      <p class="auth-error" id="authChangeError"></p>
+    </div>
+  </div>
+</div>
+
 <header>
   <h1>Brady's Total <span>Model</span></h1>
   <p style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
@@ -463,6 +527,8 @@
     <label class="btn small" for="importAllInput" title="Load a file saved with Export All Data">Import All Data</label>
     <input type="file" id="importAllInput" accept="application/json">
     <button class="btn small" id="resetStateBtn" title="Clear saved data and reload with sample data">Reset to Sample Data</button>
+    <button class="btn small" id="changePasswordBtn" title="Change your username/password">Change Login</button>
+    <button class="btn small" id="logoutBtn" title="Lock this page again">Log Out</button>
   </p>
   <div id="storageBanner" style="display:none; margin-top:10px; padding:8px 12px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:4px; color:var(--accent); font-size:12.5px;"></div>
 </header>
@@ -785,6 +851,167 @@ const STORAGE_KEY = "cbb_totals_model_state_v2";
 const CLOUD_KEY = "state";
 let usingCloudStorage = (typeof window !== "undefined" && !!window.storage);
 let storageAvailable = true; // only meaningful for the localStorage fallback
+
+// =====================================================================
+// AUTH — a username/password gate in front of the app.
+//
+// Honest limits: this is a static page with no server, so this is a
+// deterrent, not a vault. The password is salted and SHA-256 hashed (never
+// stored or compared in plaintext), and none of your teams/games/settings
+// load until login succeeds — but someone with real technical intent and
+// browser dev-tools access to this same artifact could still bypass it.
+// True server-enforced security would need an actual backend.
+//
+// The credential record is stored the same way as everything else (cloud
+// when this runs as a Claude artifact, so it follows you across devices;
+// local fallback otherwise) under its own key, separate from app data.
+// =====================================================================
+const AUTH_CLOUD_KEY = "auth";
+const AUTH_LOCAL_KEY = "cbb_totals_model_auth_v1";
+
+async function loadAuthRecord() {
+  if (usingCloudStorage) {
+    try {
+      const result = await window.storage.get(AUTH_CLOUD_KEY, false);
+      return (result && result.value) ? JSON.parse(result.value) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  try {
+    const raw = localStorage.getItem(AUTH_LOCAL_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function saveAuthRecord(record) {
+  const payload = JSON.stringify(record);
+  if (usingCloudStorage) {
+    try { await window.storage.set(AUTH_CLOUD_KEY, payload, false); } catch (e) {}
+    return;
+  }
+  try { localStorage.setItem(AUTH_LOCAL_KEY, payload); } catch (e) {}
+}
+
+function generateSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(str) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function hashPassword(password, salt) {
+  return sha256Hex(salt + ":" + password);
+}
+
+// Shows the overlay in setup or login mode and resolves once the person is
+// authenticated. Nothing in the rest of init() runs until this resolves —
+// that's what keeps app data from loading before login succeeds.
+function authenticate() {
+  return new Promise((resolve) => {
+    (async () => {
+      const overlay = document.getElementById("authOverlay");
+      overlay.classList.add("show");
+      const existing = await loadAuthRecord();
+
+      const submitOnEnter = (input, btn) => {
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") btn.click(); });
+      };
+
+      if (!existing) {
+        document.getElementById("authSetupForm").style.display = "block";
+        const btn = document.getElementById("authSetupBtn");
+        const uEl = document.getElementById("authNewUsername");
+        const pEl = document.getElementById("authNewPassword");
+        const p2El = document.getElementById("authNewPassword2");
+        const errEl = document.getElementById("authSetupError");
+        const submit = async () => {
+          const username = uEl.value.trim();
+          const pw = pEl.value;
+          const pw2 = p2El.value;
+          if (!username || !pw) { errEl.textContent = "Enter a username and password."; return; }
+          if (pw !== pw2) { errEl.textContent = "Passwords do not match."; return; }
+          if (pw.length < 4) { errEl.textContent = "Password should be at least 4 characters."; return; }
+          const salt = generateSalt();
+          const hash = await hashPassword(pw, salt);
+          await saveAuthRecord({ username, salt, hash });
+          overlay.classList.remove("show");
+          resolve();
+        };
+        btn.addEventListener("click", submit);
+        [uEl, pEl, p2El].forEach(el => submitOnEnter(el, btn));
+      } else {
+        document.getElementById("authLoginForm").style.display = "block";
+        const btn = document.getElementById("authLoginBtn");
+        const uEl = document.getElementById("authUsername");
+        const pEl = document.getElementById("authPassword");
+        const errEl = document.getElementById("authLoginError");
+        const submit = async () => {
+          const username = uEl.value.trim();
+          const pw = pEl.value;
+          const hash = await hashPassword(pw, existing.salt);
+          if (username === existing.username && hash === existing.hash) {
+            overlay.classList.remove("show");
+            resolve();
+          } else {
+            errEl.textContent = "Incorrect username or password.";
+          }
+        };
+        btn.addEventListener("click", submit);
+        [uEl, pEl].forEach(el => submitOnEnter(el, btn));
+      }
+    })();
+  });
+}
+
+async function openChangePassword() {
+  const existing = await loadAuthRecord();
+  if (!existing) { showToast("No login set up yet"); return; }
+
+  document.getElementById("authSetupForm").style.display = "none";
+  document.getElementById("authLoginForm").style.display = "none";
+  const changeForm = document.getElementById("authChangeForm");
+  changeForm.style.display = "block";
+  document.getElementById("authChangeUsername").value = existing.username;
+  document.getElementById("authChangeCurrent").value = "";
+  document.getElementById("authChangeNew").value = "";
+  document.getElementById("authChangeNew2").value = "";
+  document.getElementById("authChangeError").textContent = "";
+  document.getElementById("authOverlay").classList.add("show");
+
+  document.getElementById("authChangeCancelBtn").onclick = () => {
+    document.getElementById("authOverlay").classList.remove("show");
+    changeForm.style.display = "none";
+  };
+  document.getElementById("authChangeSaveBtn").onclick = async () => {
+    const errEl = document.getElementById("authChangeError");
+    const current = document.getElementById("authChangeCurrent").value;
+    const newUsername = document.getElementById("authChangeUsername").value.trim();
+    const newPw = document.getElementById("authChangeNew").value;
+    const newPw2 = document.getElementById("authChangeNew2").value;
+    const currentHash = await hashPassword(current, existing.salt);
+    if (currentHash !== existing.hash) { errEl.textContent = "Current password is incorrect."; return; }
+    if (!newUsername || !newPw) { errEl.textContent = "Enter a username and new password."; return; }
+    if (newPw.length < 4) { errEl.textContent = "Password should be at least 4 characters."; return; }
+    if (newPw !== newPw2) { errEl.textContent = "New passwords do not match."; return; }
+    const salt = generateSalt();
+    const hash = await hashPassword(newPw, salt);
+    await saveAuthRecord({ username: newUsername, salt, hash });
+    document.getElementById("authOverlay").classList.remove("show");
+    changeForm.style.display = "none";
+    showToast("Login updated");
+  };
+}
+
+document.getElementById("changePasswordBtn").addEventListener("click", openChangePassword);
+document.getElementById("logoutBtn").addEventListener("click", () => location.reload());
 
 function testStorageAvailable() {
   try {
@@ -2076,6 +2303,8 @@ document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
 });
 
 (async function init() {
+  await authenticate();
+
   tickClock();
   setInterval(tickClock, 1000);
   switchTab("games");
