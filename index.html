@@ -3,27 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CBB Totals Model</title>
+<title>Brady's Total Model</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #12151a;
-    --panel: #1a1e26;
-    --panel-2: #20252f;
-    --line: #2b313d;
-    --text: #e9e7e1;
-    --dim: #9099a8;
-    --accent: #f2a93b;
-    --accent-dim: #7a5b23;
-    --over: #48b57e;
-    --over-dim: #1e3b2c;
-    --under: #e0645c;
+  :root, :root[data-theme="dark"] {
+    --bg: #0f131a;
+    --panel: #171c25;
+    --panel-2: #1d2432;
+    --line: #2a3242;
+    --text: #e7ebf1;
+    --dim: #8b93a5;
+    --accent: #5ec8f2;
+    --accent-dim: #2c5a72;
+    --accent-ink: #08222e;
+    --over: #4cc38a;
+    --over-dim: #1c3a2c;
+    --under: #e0685f;
     --under-dim: #452321;
-    --lean-over: #2f4d3d;
+    --lean-over: #2c4a3c;
     --lean-under: #4a2f2c;
     --display: 'Oswald', sans-serif;
     --mono: 'IBM Plex Mono', monospace;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f4f6f9;
+    --panel: #ffffff;
+    --panel-2: #eef1f6;
+    --line: #d7dce4;
+    --text: #1b1f27;
+    --dim: #667085;
+    --accent: #1f8fd6;
+    --accent-dim: #cfeaf7;
+    --accent-ink: #ffffff;
+    --over: #1f9d63;
+    --over-dim: #dcf2e8;
+    --under: #d1453b;
+    --under-dim: #fbe2df;
+    --lean-over: #e0efe6;
+    --lean-under: #f7e3e0;
+  }
+
+  :root[data-theme="black"] {
+    --bg: #000000;
+    --panel: #0a0a0a;
+    --panel-2: #121212;
+    --line: #262626;
+    --text: #ececec;
+    --dim: #8a8a8a;
+    --accent: #5ec8f2;
+    --accent-dim: #1f4553;
+    --accent-ink: #08222e;
+    --over: #48b57e;
+    --over-dim: #16281f;
+    --under: #e0645c;
+    --under-dim: #2a1614;
+    --lean-over: #1c2b23;
+    --lean-under: #2a1c1a;
   }
 
   * { box-sizing: border-box; }
@@ -61,9 +98,10 @@
   }
 
   main {
-    max-width: 1180px;
+    max-width: none;
+    width: 100%;
     margin: 0 auto;
-    padding: 24px;
+    padding: 24px 32px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -111,8 +149,8 @@
     transition: border-color .15s, color .15s;
   }
   .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn.primary { background: var(--accent); color: #1a1400; border-color: var(--accent); }
-  .btn.primary:hover { color: #1a1400; filter: brightness(1.08); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
   .btn.small { padding: 4px 8px; font-size: 11px; }
   .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
@@ -146,7 +184,7 @@
     white-space: nowrap;
   }
 
-  tbody tr:hover td { background: #1e232c; }
+  tbody tr:hover td { background: var(--panel-2); }
 
   td input, td select {
     width: 100%;
@@ -159,10 +197,23 @@
     padding: 3px 5px;
   }
   td input:hover, td select:hover { border-color: var(--line); }
-  td input:focus, td select:focus { border-color: var(--accent); background: #12151a; }
+  td input:focus, td select:focus { border-color: var(--accent); background: var(--bg); }
   td input[type=number] { text-align: right; }
 
   .row-actions { text-align: center; width: 28px; }
+
+  #teamsTable th:first-child, #teamsTable td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--panel);
+    box-shadow: 1px 0 0 var(--line);
+    min-width: 190px;
+    width: 190px;
+  }
+  #teamsTable th:first-child { z-index: 3; }
+  #teamsTable td:first-child input { white-space: nowrap; overflow: visible; text-overflow: clip; }
+  #teamsTable tbody tr:hover td:first-child { background: var(--panel-2); }
   .del-btn {
     background: none; border: none; color: var(--dim); cursor: pointer;
     font-size: 14px; line-height: 1; padding: 2px 4px;
@@ -216,23 +267,23 @@
   .sig-lean-over    { background: var(--lean-over); color: #8fd6ab; }
   .sig-strong-under { background: var(--under-dim); color: var(--under); }
   .sig-lean-under   { background: var(--lean-under); color: #e5978f; }
-  .sig-no-edge      { background: #262b34; color: var(--dim); }
-  .sig-flag         { background: #2c2410; color: var(--accent); }
+  .sig-no-edge      { background: var(--panel-2); color: var(--dim); }
+  .sig-flag         { background: var(--accent-dim); color: var(--accent); }
 
   .hit-badge { font-weight: 600; border-radius: 3px; padding: 2px 7px; font-size: 11.5px; }
   .hit-yes  { background: var(--over-dim); color: var(--over); }
   .hit-no   { background: var(--under-dim); color: var(--under); }
-  .hit-push { background: #262b34; color: var(--dim); }
+  .hit-push { background: var(--panel-2); color: var(--dim); }
 
   .stat-block { display: flex; flex-direction: column; }
   .stat-block .num { font-family: var(--display); font-size: 20px; color: var(--text); }
   .stat-block .lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dim); }
 
-  .zbar-track { width: 90px; height: 10px; background: #262b34; border-radius: 5px; position: relative; overflow: hidden; }
+  .zbar-track { width: 90px; height: 10px; background: var(--panel-2); border-radius: 5px; position: relative; overflow: hidden; }
   .zbar-fill { position: absolute; top: 0; bottom: 0; }
   .zbar-fill.over { background: var(--over); left: 50%; }
   .zbar-fill.under { background: var(--under); right: 50%; }
-  .zbar-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #444b58; }
+  .zbar-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
 
   .empty-msg { color: var(--dim); font-style: italic; padding: 10px 4px; font-size: 12.5px; }
 
@@ -288,12 +339,86 @@
   .confirm-box p { margin: 0 0 16px; color: var(--text); font-size: 13.5px; line-height: 1.5; }
   .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
+  .theme-switch {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .theme-switch button {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    background: var(--panel-2);
+    color: var(--dim);
+    border: none;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-right: 1px solid var(--line);
+  }
+  .theme-switch button:last-child { border-right: none; }
+  .theme-switch button:hover { color: var(--text); }
+  .theme-switch button.active { background: var(--accent); color: var(--accent-ink); }
+
+  .date-filter-panel { padding: 12px 20px; }
+  .date-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .date-btn {
+    font-family: var(--display);
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .date-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #dateFilterInput {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 7px 9px;
+    border-radius: 4px;
+  }
+  #dateFilterInput:focus { border-color: var(--accent); outline: none; }
+
+  .results-log-controls {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .results-log-controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .results-log-controls select, .results-log-controls input {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 6px 8px;
+    border-radius: 4px;
+  }
+  .results-log-controls select:focus, .results-log-controls input:focus { border-color: var(--accent); outline: none; }
+  .results-log-controls input[type="number"] { width: 70px; text-align: right; }
+
   .tab-nav {
     display: flex;
     gap: 4px;
-    max-width: 1180px;
-    margin: 16px auto 0;
-    padding: 0 24px;
+    max-width: none;
+    margin: 16px 0 0;
+    padding: 0 32px;
     flex-wrap: wrap;
   }
   .tab-btn {
@@ -326,15 +451,20 @@
 <body>
 
 <header>
-  <h1>CBB Totals <span>Model</span></h1>
+  <h1>Brady's Total <span>Model</span></h1>
   <p style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
     <span class="ticker" id="dateTimeTicker"></span>
+    <span class="theme-switch" id="themeSwitch">
+      <button data-theme-btn="light">Light</button>
+      <button data-theme-btn="dark">Dark</button>
+      <button data-theme-btn="black">Black</button>
+    </span>
     <button class="btn small" id="exportAllBtn" title="Download everything (teams, games, settings, backtest log) as one file">Export All Data</button>
     <label class="btn small" for="importAllInput" title="Load a file saved with Export All Data">Import All Data</label>
     <input type="file" id="importAllInput" accept="application/json">
     <button class="btn small" id="resetStateBtn" title="Clear saved data and reload with sample data">Reset to Sample Data</button>
   </p>
-  <div id="storageBanner" style="display:none; margin-top:10px; padding:8px 12px; background:#2c2410; border:1px solid var(--accent-dim); border-radius:4px; color:var(--accent); font-size:12.5px;"></div>
+  <div id="storageBanner" style="display:none; margin-top:10px; padding:8px 12px; background:var(--accent-dim); border:1px solid var(--accent); border-radius:4px; color:var(--accent); font-size:12.5px;"></div>
 </header>
 
 <nav class="tab-nav">
@@ -342,6 +472,7 @@
   <button class="tab-btn" data-tab="teams">Team Stats</button>
   <button class="tab-btn" data-tab="games">Daily Games &amp; Output</button>
   <button class="tab-btn" data-tab="backtest">Backtest Log</button>
+  <button class="tab-btn" data-tab="resultslog">Results Log</button>
 </nav>
 
 <main>
@@ -391,6 +522,15 @@
   </div>
 
   <div class="tab-panel" data-tab="games">
+    <section class="panel date-filter-panel">
+      <div class="date-filter-bar">
+        <button class="btn date-btn" id="dateTodayBtn">Today</button>
+        <button class="btn date-btn" id="dateTomorrowBtn">Tomorrow</button>
+        <input type="date" id="dateFilterInput">
+        <span class="sub" id="dateFilterLabel" style="color:var(--dim);"></span>
+      </div>
+    </section>
+
     <section class="panel">
       <div class="panel-head">
         <h2>Games</h2>
@@ -429,7 +569,7 @@
             Auto-sort by strongest signal
           </label>
           <button class="btn small" id="downloadResultsBtn">Download Results CSV</button>
-          <button class="btn primary small" id="logTodayBtn" title="Saves today's computed games into the Backtest log below, and downloads a dated CSV">Log &amp; Download Today's Results</button>
+          <button class="btn primary small" id="logTodayBtn" title="Saves this date's computed games into the Backtest log below, and downloads a dated CSV">Log &amp; Download Results</button>
         </div>
       </div>
       <div class="sub" style="margin-bottom:10px; color:var(--dim);" id="sortHint">
@@ -470,6 +610,48 @@
             <th>Edge</th><th>Signal</th><th>Actual Total</th><th>Model Error</th><th>Signal Hit</th><th></th>
           </tr></thead>
           <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-tab="resultslog">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Results Log</h2>
+        <span class="sub" id="resultsLogSummary" style="color:var(--dim);"></span>
+      </div>
+      <div class="results-log-controls">
+        <label>group by
+          <select id="rlGroupBy">
+            <option value="game">Each game</option>
+            <option value="month" selected>Month</option>
+            <option value="signal">Signal</option>
+            <option value="edgebucket">Edge size</option>
+          </select>
+        </label>
+        <label>filter signal
+          <select id="rlFilterSignal">
+            <option value="all" selected>All</option>
+            <option value="strong">Strong only</option>
+            <option value="lean">Lean only</option>
+            <option value="noedge">No Edge only</option>
+            <option value="over">Over calls</option>
+            <option value="under">Under calls</option>
+          </select>
+        </label>
+        <label>min edge
+          <input type="number" step="any" inputmode="decimal" id="rlMinEdge" value="0">
+        </label>
+        <button class="btn small" id="rlResetBtn">Reset</button>
+      </div>
+      <div class="sub" style="margin: 10px 0; color:var(--dim);">
+        Built from every completed game on record (survives Clear Log — only Clear Stats on the Backtest tab resets it). Win% excludes No Edge calls and pushes.
+      </div>
+      <div class="table-scroll">
+        <table id="resultsLogTable">
+          <thead id="resultsLogHead"></thead>
+          <tbody id="resultsLogBody"></tbody>
         </table>
       </div>
     </section>
@@ -552,6 +734,30 @@ let autoSortResults = true;
 let sortKey = null;
 let sortDir = "desc";
 
+// Display theme: "light", "dark", or "black". Persisted like everything else.
+let themeMode = "dark";
+
+// =====================================================================
+// DATE FILTER — the Daily Games & Output tab only shows/computes games
+// whose Date matches this. Always defaults to today on load (never
+// persisted), with Today/Tomorrow/calendar controls to change it.
+// =====================================================================
+let selectedDate = "";
+
+function isoDate(d) {
+  const tzOffsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+}
+function todayISO() { return isoDate(new Date()); }
+function tomorrowISO() { const d = new Date(); d.setDate(d.getDate() + 1); return isoDate(d); }
+
+function formatDateLabel(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
 // =====================================================================
 // PERSISTENCE
 //
@@ -586,7 +792,7 @@ function testStorageAvailable() {
 }
 
 function currentSnapshot() {
-  return { teams, games, settings, history, statsRecords, autoCalcLg, autoSortResults };
+  return { teams, games, settings, history, statsRecords, autoCalcLg, autoSortResults, themeMode };
 }
 
 async function saveState() {
@@ -624,6 +830,7 @@ function applySnapshot(data) {
   }
   if (typeof data.autoCalcLg === "boolean") autoCalcLg = data.autoCalcLg;
   if (typeof data.autoSortResults === "boolean") autoSortResults = data.autoSortResults;
+  if (data.themeMode === "light" || data.themeMode === "dark" || data.themeMode === "black") themeMode = data.themeMode;
   if (data.settings && typeof data.settings === "object") {
     settingsDefs.forEach(d => {
       if (data.settings[d.key] !== undefined && !isNaN(parseFloat(data.settings[d.key]))) {
@@ -948,7 +1155,11 @@ function updateTeamNamesList() {
 function renderGamesTable() {
   const body = document.getElementById("gamesBody");
   body.innerHTML = "";
+  let shown = 0;
+
   games.forEach((g, rowIdx) => {
+    if (selectedDate && g.Date !== selectedDate) return;
+    shown++;
     const tr = document.createElement("tr");
 
     const mk = (field, type, listAttr) => {
@@ -962,6 +1173,11 @@ function renderGamesTable() {
         games[rowIdx][field] = type === "number" ? (input.value === "" ? "" : parseFloat(input.value)) : input.value;
         recompute();
       });
+      if (field === "Date") {
+        // Re-filter only once editing is done (change/blur), not on every
+        // keystroke — rebuilding the table mid-type would steal focus.
+        input.addEventListener("change", () => { renderGamesTable(); recompute(); });
+      }
       td.appendChild(input);
       return td;
     };
@@ -983,6 +1199,12 @@ function renderGamesTable() {
 
     body.appendChild(tr);
   });
+
+  if (shown === 0) {
+    body.innerHTML = `<tr><td colspan="5" class="empty-msg">No games logged for ${formatDateLabel(selectedDate)}. Add one below.</td></tr>`;
+  }
+
+  updateDateFilterLabel(shown);
 }
 
 // =====================================================================
@@ -1085,14 +1307,16 @@ function recompute() {
   body.innerHTML = "";
   lastResults = [];
 
-  if (games.length === 0) {
-    body.innerHTML = `<tr><td colspan="12" class="empty-msg">Add a game above to see model output.</td></tr>`;
+  const dayGames = games.filter(g => !selectedDate || g.Date === selectedDate);
+
+  if (dayGames.length === 0) {
+    body.innerHTML = `<tr><td colspan="12" class="empty-msg">No games for ${formatDateLabel(selectedDate)}. Add one above, or switch dates.</td></tr>`;
     updateSortHeaderUI();
     return;
   }
 
   const rows = [];
-  games.forEach(g => {
+  dayGames.forEach(g => {
     if (!g.Home && !g.Away) return;
     const res = computeGame(g.Home, g.Away, g.MarketTotal, idx, settings);
     rows.push({ game: g, res });
@@ -1132,7 +1356,7 @@ function recompute() {
   });
 
   if (body.innerHTML === "") {
-    body.innerHTML = `<tr><td colspan="12" class="empty-msg">Add a game above to see model output.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="12" class="empty-msg">No games for ${formatDateLabel(selectedDate)}. Add one above, or switch dates.</td></tr>`;
   }
 
   updateSortHeaderUI();
@@ -1371,21 +1595,11 @@ function importAllData(file) {
     const ok = await showConfirm("This replaces everything currently loaded here — teams, games, settings, and backtest log — with the contents of the file. Continue?");
     if (!ok) return;
 
-    teams = Array.isArray(data.teams) ? data.teams : teams;
-    games = Array.isArray(data.games) ? data.games : games;
-    history = Array.isArray(data.history) ? data.history : [];
-    if (typeof data.autoCalcLg === "boolean") autoCalcLg = data.autoCalcLg;
-    if (typeof data.autoSortResults === "boolean") autoSortResults = data.autoSortResults;
-    if (data.settings && typeof data.settings === "object") {
-      settingsDefs.forEach(d => {
-        if (data.settings[d.key] !== undefined && !isNaN(parseFloat(data.settings[d.key]))) {
-          settings[d.key] = parseFloat(data.settings[d.key]);
-        }
-      });
-    }
+    applySnapshot(data);
 
     document.getElementById("teamSearchInput").value = "";
     document.getElementById("autoSortToggle").checked = autoSortResults;
+    applyTheme(themeMode);
     renderSettings();
     renderTeamsTable();
     updateTeamNamesList();
@@ -1459,15 +1673,22 @@ document.getElementById("gamesCsvInput").addEventListener("change", (e) => {
   const reader = new FileReader();
   reader.onload = () => {
     const rows = parseCSV(reader.result);
-    games = rows.map(r => ({
-      Date: r.Date || r.date || "",
-      Home: r.Home || r.home || "",
-      Away: r.Away || r.away || "",
-      MarketTotal: parseFloat(r.MarketTotal || r.marketTotal || r.market_total) || ""
-    }));
+    const gameKey = g => [g.Date, g.Home, g.Away].map(v => String(v || "").trim().toLowerCase()).join("|");
+    let added = 0, updated = 0;
+    rows.forEach(r => {
+      const g = {
+        Date: r.Date || r.date || "",
+        Home: r.Home || r.home || "",
+        Away: r.Away || r.away || "",
+        MarketTotal: parseFloat(r.MarketTotal || r.marketTotal || r.market_total) || ""
+      };
+      const key = gameKey(g);
+      const idx = games.findIndex(existing => gameKey(existing) === key);
+      if (idx >= 0) { games[idx] = g; updated++; } else { games.push(g); added++; }
+    });
     renderGamesTable();
     recompute();
-    showToast(`Imported ${games.length} games`);
+    showToast(`Added ${added} game(s), updated ${updated} — other dates untouched`);
   };
   reader.readAsText(file);
   e.target.value = "";
@@ -1487,23 +1708,25 @@ document.getElementById("teamSearchInput").addEventListener("input", () => {
 });
 
 document.getElementById("clearGamesBtn").addEventListener("click", async () => {
-  if (games.length === 0) return;
-  const ok = await showConfirm(`Remove all ${games.length} games from the Games table? This can't be undone (your Backtest Log is separate and won't be affected).`);
+  const dayGames = games.filter(g => !selectedDate || g.Date === selectedDate);
+  if (dayGames.length === 0) { showToast(`No games for ${formatDateLabel(selectedDate)} to clear`); return; }
+  const ok = await showConfirm(`Remove ${dayGames.length} game(s) for ${formatDateLabel(selectedDate)}? Other dates are unaffected. This can't be undone (your Backtest Log is separate and won't be affected).`);
   if (ok) {
-    games = [];
+    games = games.filter(g => selectedDate && g.Date !== selectedDate);
     renderGamesTable();
     recompute();
   }
 });
 
 document.getElementById("addGameBtn").addEventListener("click", () => {
-  const date = document.getElementById("newDate").value.trim();
+  const date = document.getElementById("newDate").value.trim() || selectedDate;
   const home = document.getElementById("newHome").value.trim();
   const away = document.getElementById("newAway").value.trim();
   const market = document.getElementById("newMarket").value.trim();
   if (!home || !away) { showToast("Enter a home and away team"); return; }
   games.push({ Date: date, Home: home, Away: away, MarketTotal: market === "" ? "" : parseFloat(market) });
-  ["newDate","newHome","newAway","newMarket"].forEach(id => document.getElementById(id).value = "");
+  ["newHome","newAway","newMarket"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("newDate").value = selectedDate; // reset to the date currently being viewed
   renderGamesTable();
   recompute();
 });
@@ -1530,6 +1753,20 @@ document.getElementById("applyStdDevBtn").addEventListener("click", applyStdDevT
 
 function isCompleted(h) {
   return h.ActualTotal !== "" && h.ActualTotal !== null && h.ActualTotal !== undefined && !isNaN(h.ActualTotal);
+}
+
+// Classifies a completed record's signal call: 'hit', 'miss', 'push', or
+// null (not a decided call — No Edge, or missing signal). Shared by the
+// Backtest Log hit badges and the Results Log group stats so both agree.
+function resultOutcome(r) {
+  if (!isCompleted(r)) return null;
+  const actual = parseFloat(r.ActualTotal);
+  const market = parseFloat(r.MarketTotal);
+  if (actual === market) return "push";
+  if (!r.Signal || r.Signal === "No Edge") return null;
+  const isOverCall = r.Signal.includes("Over");
+  const wentOver = actual > market;
+  return wentOver === isOverCall ? "hit" : "miss";
 }
 
 document.getElementById("clearHistoryBtn").addEventListener("click", async () => {
@@ -1595,6 +1832,48 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 });
 
 // =====================================================================
+// DATE FILTER CONTROLS — Today / Tomorrow / calendar picker
+// =====================================================================
+function updateDateFilterLabel(shownCount) {
+  const label = document.getElementById("dateFilterLabel");
+  if (label) label.textContent = `${shownCount} game${shownCount === 1 ? "" : "s"} — ${formatDateLabel(selectedDate)}`;
+  document.getElementById("dateTodayBtn").classList.toggle("active", selectedDate === todayISO());
+  document.getElementById("dateTomorrowBtn").classList.toggle("active", selectedDate === tomorrowISO());
+}
+
+function setSelectedDate(iso) {
+  selectedDate = iso;
+  document.getElementById("dateFilterInput").value = iso;
+  document.getElementById("newDate").value = iso;
+  renderGamesTable();
+  recompute();
+}
+
+document.getElementById("dateTodayBtn").addEventListener("click", () => setSelectedDate(todayISO()));
+document.getElementById("dateTomorrowBtn").addEventListener("click", () => setSelectedDate(tomorrowISO()));
+document.getElementById("dateFilterInput").addEventListener("change", (e) => {
+  if (e.target.value) setSelectedDate(e.target.value);
+});
+
+// =====================================================================
+// THEME — light / dark / black, persisted like everything else
+// =====================================================================
+function applyTheme(mode) {
+  themeMode = mode;
+  document.documentElement.setAttribute("data-theme", mode);
+  document.querySelectorAll("#themeSwitch button").forEach(b => {
+    b.classList.toggle("active", b.dataset.themeBtn === mode);
+  });
+}
+
+document.querySelectorAll("#themeSwitch button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    applyTheme(btn.dataset.themeBtn);
+    saveState();
+  });
+});
+
+// =====================================================================
 // DATE/TIME TICKER — updates every second
 // =====================================================================
 function tickClock() {
@@ -1626,6 +1905,10 @@ document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
   tickClock();
   setInterval(tickClock, 1000);
   switchTab("games");
+  applyTheme(themeMode); // default, avoids a flash before the saved value loads
+  selectedDate = todayISO();
+  document.getElementById("dateFilterInput").value = selectedDate;
+  document.getElementById("newDate").value = selectedDate;
 
   if (!usingCloudStorage) {
     storageAvailable = testStorageAvailable();
@@ -1634,6 +1917,7 @@ document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
     }
   }
   await loadState();
+  applyTheme(themeMode); // re-apply now that the persisted choice (if any) is loaded
 
   document.getElementById("autoSortToggle").checked = autoSortResults;
   renderSettings();
