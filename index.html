@@ -622,6 +622,12 @@
         <span class="sub" id="resultsLogSummary" style="color:var(--dim);"></span>
       </div>
       <div class="results-log-controls">
+        <label>from
+          <input type="date" id="rlDateFrom">
+        </label>
+        <label>to
+          <input type="date" id="rlDateTo">
+        </label>
         <label>group by
           <select id="rlGroupBy">
             <option value="game">Each game</option>
@@ -1526,6 +1532,7 @@ function renderHistoryTable() {
       errTd.innerHTML = errorCell;
       hitTd.innerHTML = hitCell;
       renderBacktestStats();
+      renderResultsLog();
       saveState();
     });
     actualTd.appendChild(actualInput);
@@ -1605,6 +1612,7 @@ function importAllData(file) {
     updateTeamNamesList();
     renderGamesTable();
     renderHistoryTable();
+    renderResultsLog();
     recalcLeagueAveragesFromTeams();
     recompute();
     saveState();
@@ -1787,6 +1795,7 @@ document.getElementById("clearStatsBtn").addEventListener("click", async () => {
     statsRecords = [];
     history.forEach(h => { h.ActualTotal = ""; });
     renderHistoryTable();
+    renderResultsLog();
     saveState();
     showToast("Stats dashboard reset");
   }
@@ -1853,6 +1862,171 @@ document.getElementById("dateTodayBtn").addEventListener("click", () => setSelec
 document.getElementById("dateTomorrowBtn").addEventListener("click", () => setSelectedDate(tomorrowISO()));
 document.getElementById("dateFilterInput").addEventListener("change", (e) => {
   if (e.target.value) setSelectedDate(e.target.value);
+});
+
+// =====================================================================
+// RESULTS LOG — group/filter view over statsRecords (the permanent
+// completed-game record). Independent of the Backtest Log table above;
+// this is purely a read-only analysis view.
+// =====================================================================
+function edgeBucketLabel(edge) {
+  const a = Math.abs(edge);
+  if (a < 2) return "0–2";
+  if (a < 4) return "2–4";
+  if (a < 6) return "4–6";
+  if (a < 8) return "6–8";
+  return "8+";
+}
+
+function monthLabel(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})/);
+  if (!m) return "Unknown";
+  const dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, 1);
+  return dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+
+function getResultsLogRecords() {
+  const filterSignal = document.getElementById("rlFilterSignal").value;
+  const minEdge = parseFloat(document.getElementById("rlMinEdge").value) || 0;
+  const dateFrom = document.getElementById("rlDateFrom").value;
+  const dateTo = document.getElementById("rlDateTo").value;
+  return statsRecords.filter(isCompleted).filter(r => {
+    if (dateFrom && String(r.Date || "") < dateFrom) return false;
+    if (dateTo && String(r.Date || "") > dateTo) return false;
+    if (Math.abs(r.Edge) < minEdge) return false;
+    const sig = r.Signal || "";
+    if (filterSignal === "strong" && !sig.startsWith("Strong")) return false;
+    if (filterSignal === "lean" && !sig.startsWith("Lean")) return false;
+    if (filterSignal === "noedge" && sig !== "No Edge") return false;
+    if (filterSignal === "over" && !sig.includes("Over")) return false;
+    if (filterSignal === "under" && !sig.includes("Under")) return false;
+    return true;
+  });
+}
+
+function aggregateRecords(records) {
+  let hits = 0, misses = 0, pushes = 0, edgeSum = 0, errSum = 0, errCount = 0;
+  records.forEach(r => {
+    const outcome = resultOutcome(r);
+    if (outcome === "hit") hits++;
+    else if (outcome === "miss") misses++;
+    else if (outcome === "push") pushes++;
+    edgeSum += (parseFloat(r.Edge) || 0);
+    const actual = parseFloat(r.ActualTotal);
+    if (!isNaN(actual)) { errSum += (actual - r.ModelTotal); errCount++; }
+  });
+  const decided = hits + misses;
+  return {
+    n: records.length, hits, misses, pushes,
+    winPct: decided > 0 ? (hits / decided * 100) : null,
+    avgEdge: records.length > 0 ? edgeSum / records.length : 0,
+    avgError: errCount > 0 ? errSum / errCount : null
+  };
+}
+
+function renderResultsLog() {
+  const records = getResultsLogRecords();
+  const groupBy = document.getElementById("rlGroupBy").value;
+  const thead = document.getElementById("resultsLogHead");
+  const tbody = document.getElementById("resultsLogBody");
+  const summary = document.getElementById("resultsLogSummary");
+
+  const overall = aggregateRecords(records);
+  summary.textContent = records.length === 0
+    ? "No graded plays match these filters"
+    : `${overall.n} graded — ${overall.winPct !== null ? overall.winPct.toFixed(1) + "% win" : "no decided calls"}`;
+
+  if (groupBy === "game") {
+    thead.innerHTML = `<tr>
+      <th>Date</th><th>Home</th><th>Away</th><th>Market</th><th>Model</th>
+      <th>Edge</th><th>Signal</th><th>Actual</th><th>Result</th>
+    </tr>`;
+    tbody.innerHTML = "";
+    if (records.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No graded plays match these filters.</td></tr>`;
+      return;
+    }
+    const sorted = records.slice().sort((a, b) => String(b.Date || "").localeCompare(String(a.Date || "")));
+    sorted.forEach(r => {
+      const outcome = resultOutcome(r);
+      const resultHtml = outcome === "hit" ? `<span class="hit-badge hit-yes">Hit</span>`
+        : outcome === "miss" ? `<span class="hit-badge hit-no">Miss</span>`
+        : outcome === "push" ? `<span class="hit-badge hit-push">Push</span>`
+        : `<span class="hit-badge hit-push">N/A</span>`;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.Date || ""}</td><td>${r.Home || ""}</td><td>${r.Away || ""}</td>
+        <td>${r.MarketTotal ?? ""}</td><td>${r.ModelTotal ?? ""}</td>
+        <td>${r.Edge > 0 ? "+" : ""}${r.Edge}</td>
+        <td class="signal-cell ${signalClass(r.Signal)}">${r.Signal || ""}</td>
+        <td>${r.ActualTotal}</td>
+        <td>${resultHtml}</td>`;
+      tbody.appendChild(tr);
+    });
+    return;
+  }
+
+  // Grouped modes: Month / Signal / Edge size
+  thead.innerHTML = `<tr>
+    <th>${groupBy === "month" ? "Month" : groupBy === "signal" ? "Signal" : "Edge Size"}</th>
+    <th>N</th><th>W-L-P</th><th>Win%</th><th>Avg Edge</th><th>Avg Error</th>
+  </tr>`;
+  tbody.innerHTML = "";
+
+  if (records.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">No graded plays match these filters.</td></tr>`;
+    return;
+  }
+
+  const groups = {};
+  const keyOrder = [];
+  records.forEach(r => {
+    let key;
+    if (groupBy === "month") key = r.Date ? r.Date.slice(0, 7) : "Unknown";
+    else if (groupBy === "signal") key = r.Signal || "Unknown";
+    else key = edgeBucketLabel(r.Edge);
+    if (!groups[key]) { groups[key] = []; keyOrder.push(key); }
+    groups[key].push(r);
+  });
+
+  let sortedKeys;
+  if (groupBy === "month") {
+    sortedKeys = keyOrder.slice().sort().reverse(); // most recent month first
+  } else if (groupBy === "signal") {
+    const order = ["Strong Over", "Strong Under", "Lean Over", "Lean Under", "No Edge"];
+    sortedKeys = keyOrder.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  } else {
+    const order = ["0–2", "2–4", "4–6", "6–8", "8+"];
+    sortedKeys = keyOrder.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }
+
+  sortedKeys.forEach(key => {
+    const stats = aggregateRecords(groups[key]);
+    const label = groupBy === "month" ? monthLabel(key) : key;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${label}</td>
+      <td>${stats.n}</td>
+      <td>${stats.hits}-${stats.misses}-${stats.pushes}</td>
+      <td>${stats.winPct !== null ? stats.winPct.toFixed(1) + "%" : "—"}</td>
+      <td>${stats.avgEdge > 0 ? "+" : ""}${stats.avgEdge.toFixed(1)}</td>
+      <td>${stats.avgError !== null ? (stats.avgError > 0 ? "+" : "") + stats.avgError.toFixed(1) : "—"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+["rlGroupBy", "rlFilterSignal", "rlMinEdge", "rlDateFrom", "rlDateTo"].forEach(id => {
+  document.getElementById(id).addEventListener("input", renderResultsLog);
+  document.getElementById(id).addEventListener("change", renderResultsLog);
+});
+
+document.getElementById("rlResetBtn").addEventListener("click", () => {
+  document.getElementById("rlGroupBy").value = "month";
+  document.getElementById("rlFilterSignal").value = "all";
+  document.getElementById("rlMinEdge").value = "0";
+  document.getElementById("rlDateFrom").value = "";
+  document.getElementById("rlDateTo").value = "";
+  renderResultsLog();
 });
 
 // =====================================================================
@@ -1925,6 +2099,7 @@ document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
   updateTeamNamesList();
   renderGamesTable();
   renderHistoryTable();
+  renderResultsLog();
   recalcLeagueAveragesFromTeams();
   recompute();
 })();
