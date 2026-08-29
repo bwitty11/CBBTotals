@@ -583,9 +583,9 @@
       <div class="table-scroll">
         <table id="teamsTable">
           <thead><tr>
-            <th>Team</th><th>AdjTempo</th><th>AdjOE</th><th>AdjDE</th>
-            <th>eFG Off</th><th>eFG Def</th><th>FTR Off</th><th>FTR Def</th><th>TOV Off</th><th>TOV Def</th>
-            <th>ORB Off</th><th>ORB Def</th><th></th>
+            <th class="sortable" data-sort="Team">Team</th><th class="sortable" data-sort="AdjTempo">AdjTempo</th><th class="sortable" data-sort="AdjOE">AdjOE</th><th class="sortable" data-sort="AdjDE">AdjDE</th>
+            <th class="sortable" data-sort="EFGOff">eFG Off</th><th class="sortable" data-sort="EFGDef">eFG Def</th><th class="sortable" data-sort="FTROff">FTR Off</th><th class="sortable" data-sort="FTRDef">FTR Def</th><th class="sortable" data-sort="TOVOff">TOV Off</th><th class="sortable" data-sort="TOVDef">TOV Def</th>
+            <th class="sortable" data-sort="ORBOff">ORB Off</th><th class="sortable" data-sort="ORBDef">ORB Def</th><th></th>
           </tr></thead>
           <tbody id="teamsBody"></tbody>
         </table>
@@ -1279,16 +1279,32 @@ function recalcLeagueAveragesFromTeams() {
 // =====================================================================
 // RENDER: Team Stats table
 // =====================================================================
+let teamSortKey = null;
+let teamSortDir = "asc";
+
 function renderTeamsTable() {
   const body = document.getElementById("teamsBody");
   body.innerHTML = "";
 
   const query = (document.getElementById("teamSearchInput").value || "").trim().toLowerCase();
-  let shown = 0;
 
-  teams.forEach((team, rowIdx) => {
-    if (query && !String(team.Team || "").toLowerCase().includes(query)) return;
-    shown++;
+  let rows = teams.map((team, rowIdx) => ({ team, rowIdx }))
+    .filter(({ team }) => !query || String(team.Team || "").toLowerCase().includes(query));
+
+  if (teamSortKey) {
+    rows = rows.slice().sort((a, b) => {
+      let av = a.team[teamSortKey];
+      let bv = b.team[teamSortKey];
+      if (TEAM_NUMERIC.includes(teamSortKey)) {
+        av = parseFloat(av) || 0;
+        bv = parseFloat(bv) || 0;
+        return (av - bv) * (teamSortDir === "asc" ? 1 : -1);
+      }
+      return String(av || "").localeCompare(String(bv || "")) * (teamSortDir === "asc" ? 1 : -1);
+    });
+  }
+
+  rows.forEach(({ team, rowIdx }) => {
     const tr = document.createElement("tr");
     TEAM_FIELDS.forEach(field => {
       const td = document.createElement("td");
@@ -1319,13 +1335,27 @@ function renderTeamsTable() {
     body.appendChild(tr);
   });
 
-  if (shown === 0) {
+  if (rows.length === 0) {
     body.innerHTML = `<tr><td colspan="13" class="empty-msg">No teams match "${query}".</td></tr>`;
   }
 
   const countLabel = document.getElementById("teamCountLabel");
-  countLabel.textContent = query ? `Showing ${shown} of ${teams.length}` : `${teams.length} teams`;
+  countLabel.textContent = query ? `Showing ${rows.length} of ${teams.length}` : `${teams.length} teams`;
+
+  document.querySelectorAll('#teamsTable th[data-sort]').forEach(th => {
+    th.textContent = th.textContent.replace(/ [▲▼]$/, "");
+    if (th.dataset.sort === teamSortKey) th.textContent += teamSortDir === "asc" ? " ▲" : " ▼";
+  });
 }
+
+document.querySelectorAll('#teamsTable th[data-sort]').forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (teamSortKey === key) teamSortDir = teamSortDir === "asc" ? "desc" : "asc";
+    else { teamSortKey = key; teamSortDir = "asc"; }
+    renderTeamsTable();
+  });
+});
 
 function updateTeamNamesList() {
   const dl = document.getElementById("teamNames");
@@ -2088,7 +2118,7 @@ function aggregateRecords(records) {
     if (outcome === "hit") hits++;
     else if (outcome === "miss") misses++;
     else if (outcome === "push") pushes++;
-    edgeSum += (parseFloat(r.Edge) || 0);
+    edgeSum += Math.abs(parseFloat(r.Edge) || 0);
     const actual = parseFloat(r.ActualTotal);
     if (!isNaN(actual)) { errSum += (actual - r.ModelTotal); errCount++; }
   });
@@ -2099,6 +2129,64 @@ function aggregateRecords(records) {
     avgEdge: records.length > 0 ? edgeSum / records.length : 0,
     avgError: errCount > 0 ? errSum / errCount : null
   };
+}
+
+let rlSortKey = null;
+let rlSortDir = "desc";
+
+function rlSortValue(row, key, groupBy) {
+  if (groupBy === "game") {
+    if (key === "Result") return resultOutcome(row);
+    const v = row[key];
+    return (key === "MarketTotal" || key === "ModelTotal" || key === "Edge" || key === "ActualTotal")
+      ? (parseFloat(v) || 0) : (v || "");
+  }
+  // grouped rows: row = { label, stats }
+  if (key === "label") return row.label;
+  if (key === "n") return row.stats.n;
+  if (key === "wins") return row.stats.hits;
+  if (key === "winPct") return row.stats.winPct === null ? -1 : row.stats.winPct;
+  if (key === "avgEdge") return row.stats.avgEdge;
+  if (key === "avgError") return row.stats.avgError === null ? -Infinity : row.stats.avgError;
+  return 0;
+}
+
+function applyRlSort(rows, groupBy, defaultCompare) {
+  if (!rlSortKey) return defaultCompare ? rows.slice().sort(defaultCompare) : rows;
+  const dir = rlSortDir === "asc" ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const av = rlSortValue(a, rlSortKey, groupBy);
+    const bv = rlSortValue(b, rlSortKey, groupBy);
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
+}
+
+function attachRlSortHandlers(groupBy) {
+  document.querySelectorAll("#resultsLogHead th[data-sort]").forEach(th => {
+    const key = th.dataset.sort;
+    if (rlSortKey === key) th.textContent += rlSortDir === "asc" ? " ▲" : " ▼";
+    th.addEventListener("click", () => {
+      if (rlSortKey === key) rlSortDir = rlSortDir === "asc" ? "desc" : "asc";
+      else { rlSortKey = key; rlSortDir = "desc"; }
+      renderResultsLog();
+    });
+  });
+}
+
+async function deleteStatsRecord(record) {
+  const label = `${record.Home || "?"} vs ${record.Away || "?"} (${record.Date || "no date"})`;
+  const ok = await showConfirm(`Remove ${label} from the results log? This also clears its Actual Total in the Backtest Log, so it stops counting toward every stat.`);
+  if (!ok) return;
+  const key = historyKey(record);
+  const idx = statsRecords.findIndex(r => historyKey(r) === key);
+  if (idx >= 0) statsRecords.splice(idx, 1);
+  const hIdx = history.findIndex(h => historyKey(h) === key);
+  if (hIdx >= 0) history[hIdx].ActualTotal = "";
+  renderResultsLog();
+  renderHistoryTable();
+  saveState();
+  showToast("Removed from results log");
 }
 
 function renderResultsLog() {
@@ -2115,15 +2203,18 @@ function renderResultsLog() {
 
   if (groupBy === "game") {
     thead.innerHTML = `<tr>
-      <th>Date</th><th>Home</th><th>Away</th><th>Market</th><th>Model</th>
-      <th>Edge</th><th>Signal</th><th>Actual</th><th>Result</th>
+      <th class="sortable" data-sort="Date">Date</th><th class="sortable" data-sort="Home">Home</th><th class="sortable" data-sort="Away">Away</th>
+      <th class="sortable" data-sort="MarketTotal">Market</th><th class="sortable" data-sort="ModelTotal">Model</th>
+      <th class="sortable" data-sort="Edge">Edge</th><th class="sortable" data-sort="Signal">Signal</th>
+      <th class="sortable" data-sort="ActualTotal">Actual</th><th class="sortable" data-sort="Result">Result</th><th></th>
     </tr>`;
+    attachRlSortHandlers("game");
     tbody.innerHTML = "";
     if (records.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No graded plays match these filters.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">No graded plays match these filters.</td></tr>`;
       return;
     }
-    const sorted = records.slice().sort((a, b) => String(b.Date || "").localeCompare(String(a.Date || "")));
+    const sorted = applyRlSort(records, "game", (a, b) => String(b.Date || "").localeCompare(String(a.Date || "")));
     sorted.forEach(r => {
       const outcome = resultOutcome(r);
       const resultHtml = outcome === "hit" ? `<span class="hit-badge hit-yes">Hit</span>`
@@ -2138,6 +2229,11 @@ function renderResultsLog() {
         <td class="signal-cell ${signalClass(r.Signal)}">${r.Signal || ""}</td>
         <td>${r.ActualTotal}</td>
         <td>${resultHtml}</td>`;
+      const tdDel = document.createElement("td");
+      tdDel.className = "row-actions";
+      tdDel.innerHTML = `<button class="del-btn" title="Remove this game from the results log">&times;</button>`;
+      tdDel.querySelector("button").addEventListener("click", () => deleteStatsRecord(r));
+      tr.appendChild(tdDel);
       tbody.appendChild(tr);
     });
     return;
@@ -2145,9 +2241,12 @@ function renderResultsLog() {
 
   // Grouped modes: Month / Signal / Edge size
   thead.innerHTML = `<tr>
-    <th>${groupBy === "month" ? "Month" : groupBy === "signal" ? "Signal" : "Edge Size"}</th>
-    <th>N</th><th>W-L-P</th><th>Win%</th><th>Avg Edge</th><th>Avg Error</th>
+    <th class="sortable" data-sort="label">${groupBy === "month" ? "Month" : groupBy === "signal" ? "Signal" : "Edge Size"}</th>
+    <th class="sortable" data-sort="n">N</th><th class="sortable" data-sort="wins">W-L-P</th>
+    <th class="sortable" data-sort="winPct">Win%</th><th class="sortable" data-sort="avgEdge">Avg |Edge|</th>
+    <th class="sortable" data-sort="avgError">Avg Error</th>
   </tr>`;
+  attachRlSortHandlers(groupBy);
   tbody.innerHTML = "";
 
   if (records.length === 0) {
@@ -2177,24 +2276,34 @@ function renderResultsLog() {
     sortedKeys = keyOrder.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
 
-  sortedKeys.forEach(key => {
-    const stats = aggregateRecords(groups[key]);
-    const label = groupBy === "month" ? monthLabel(key) : key;
+  let groupRows = sortedKeys.map(key => ({
+    label: groupBy === "month" ? monthLabel(key) : key,
+    stats: aggregateRecords(groups[key])
+  }));
+  groupRows = applyRlSort(groupRows, groupBy, null);
+
+  groupRows.forEach(({ label, stats }) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${label}</td>
       <td>${stats.n}</td>
       <td>${stats.hits}-${stats.misses}-${stats.pushes}</td>
       <td>${stats.winPct !== null ? stats.winPct.toFixed(1) + "%" : "—"}</td>
-      <td>${stats.avgEdge > 0 ? "+" : ""}${stats.avgEdge.toFixed(1)}</td>
+      <td>${stats.avgEdge.toFixed(1)}</td>
       <td>${stats.avgError !== null ? (stats.avgError > 0 ? "+" : "") + stats.avgError.toFixed(1) : "—"}</td>`;
     tbody.appendChild(tr);
   });
 }
 
-["rlGroupBy", "rlFilterSignal", "rlMinEdge", "rlDateFrom", "rlDateTo"].forEach(id => {
+["rlFilterSignal", "rlMinEdge", "rlDateFrom", "rlDateTo"].forEach(id => {
   document.getElementById(id).addEventListener("input", renderResultsLog);
   document.getElementById(id).addEventListener("change", renderResultsLog);
+});
+
+document.getElementById("rlGroupBy").addEventListener("change", () => {
+  rlSortKey = null; // column set differs per mode; a leftover sort key wouldn't match
+  rlSortDir = "desc";
+  renderResultsLog();
 });
 
 document.getElementById("rlResetBtn").addEventListener("click", () => {
@@ -2203,6 +2312,8 @@ document.getElementById("rlResetBtn").addEventListener("click", () => {
   document.getElementById("rlMinEdge").value = "0";
   document.getElementById("rlDateFrom").value = "";
   document.getElementById("rlDateTo").value = "";
+  rlSortKey = null;
+  rlSortDir = "desc";
   renderResultsLog();
 });
 
