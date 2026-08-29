@@ -6,6 +6,7 @@
 <title>Brady's Total Model</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root, :root[data-theme="dark"] {
     --bg: #0f131a;
@@ -366,6 +367,16 @@
   .auth-box .auth-actions { display: flex; gap: 8px; margin-top: 6px; }
   .auth-box .auth-actions .btn { flex: 1; }
   .auth-error { color: var(--under); font-size: 12px; margin-top: 10px; min-height: 14px; }
+  .auth-note { color: var(--dim); font-size: 11.5px; margin-top: 8px; line-height: 1.5; }
+
+  .auth-tabs { display: flex; gap: 4px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .auth-tab {
+    flex: 1; padding: 8px; background: var(--panel-2); border: none; border-right: 1px solid var(--line);
+    color: var(--dim); font-family: var(--display); font-weight: 600; letter-spacing: 0.5px;
+    font-size: 12.5px; cursor: pointer;
+  }
+  .auth-tab:last-child { border-right: none; }
+  .auth-tab.active { background: var(--accent); color: var(--accent-ink); }
 
   .theme-switch {
     display: inline-flex;
@@ -482,27 +493,22 @@
   <div class="auth-box">
     <h1>Brady's Total <span>Model</span></h1>
 
-    <div id="authSetupForm" style="display:none;">
-      <p class="auth-sub">First time here — set up a username and password. You'll be asked for these every time this page loads, on any device.</p>
-      <div class="field"><label>Username</label><input type="text" id="authNewUsername" autocomplete="username"></div>
-      <div class="field"><label>Password</label><input type="password" id="authNewPassword" autocomplete="new-password"></div>
-      <div class="field"><label>Confirm Password</label><input type="password" id="authNewPassword2" autocomplete="new-password"></div>
-      <button class="btn primary" id="authSetupBtn" style="width:100%;">Create Login</button>
-      <p class="auth-error" id="authSetupError"></p>
-    </div>
-
-    <div id="authLoginForm" style="display:none;">
-      <p class="auth-sub">Enter your username and password to continue.</p>
-      <div class="field"><label>Username</label><input type="text" id="authUsername" autocomplete="username"></div>
+    <div id="authAuthForm">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="authTabLogin" type="button">Log In</button>
+        <button class="auth-tab" id="authTabSignup" type="button">Sign Up</button>
+      </div>
+      <p class="auth-sub" id="authFormSub">Log in to load your data on this device.</p>
+      <div class="field"><label>Username</label><input type="text" id="authEmail" autocomplete="username"></div>
       <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>
-      <button class="btn primary" id="authLoginBtn" style="width:100%;">Log In</button>
-      <p class="auth-error" id="authLoginError"></p>
+      <div class="field" id="authPassword2Field" style="display:none;"><label>Confirm Password</label><input type="password" id="authPassword2" autocomplete="new-password"></div>
+      <button class="btn primary" id="authSubmitBtn" style="width:100%;">Log In</button>
+      <p class="auth-error" id="authFormError"></p>
+      <p class="auth-note" id="authFormNote"></p>
     </div>
 
     <div id="authChangeForm" style="display:none;">
-      <p class="auth-sub">Change your username or password.</p>
-      <div class="field"><label>Current Password</label><input type="password" id="authChangeCurrent" autocomplete="current-password"></div>
-      <div class="field"><label>Username</label><input type="text" id="authChangeUsername" autocomplete="username"></div>
+      <p class="auth-sub">Change your password.</p>
       <div class="field"><label>New Password</label><input type="password" id="authChangeNew" autocomplete="new-password"></div>
       <div class="field"><label>Confirm New Password</label><input type="password" id="authChangeNew2" autocomplete="new-password"></div>
       <div class="auth-actions">
@@ -831,156 +837,117 @@ function formatDateLabel(iso) {
 }
 
 // =====================================================================
-// PERSISTENCE
-//
-// Two backends, chosen automatically:
-//
-// 1) CLOUD (preferred) — when this page is running as a Claude artifact,
-//    `window.storage` is available and is tied to your Claude account,
-//    not this browser/device. Save here and the same data shows up when
-//    you open this artifact anywhere else. This is what makes "use it on
-//    a different laptop" work with zero manual steps.
-//
-// 2) LOCAL FALLBACK — if this file is saved and opened directly in a
-//    plain browser tab (outside Claude), window.storage doesn't exist,
-//    so we fall back to this browser's localStorage. That only persists
-//    on this one device/browser — use Export/Import All Data to move
-//    data between devices in that case.
+// SUPABASE — real backend. Auth is enforced server-side (Supabase checks
+// the password, not this page), and app data lives in the `app_state`
+// table, one row per user, locked down by row-level security so a user
+// can only ever read/write their own row. This is what makes the page
+// work from any device via a plain URL — no Claude account involved.
 // =====================================================================
-const STORAGE_KEY = "cbb_totals_model_state_v2";
-const CLOUD_KEY = "state";
-let usingCloudStorage = (typeof window !== "undefined" && !!window.storage);
-let storageAvailable = true; // only meaningful for the localStorage fallback
+const SUPABASE_URL = "https://lezdrzqmhdrlwhjumamp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlemRyenFtaGRybHdoanVtYW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NTg4NzIsImV4cCI6MjEwMzUzNDg3Mn0.HqexdhyQ3irhS8X1nwwVEN-w9ixj9KHkB5LC3Nads94";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUserId = null;
 
 // =====================================================================
-// AUTH — a username/password gate in front of the app.
-//
-// Honest limits: this is a static page with no server, so this is a
-// deterrent, not a vault. The password is salted and SHA-256 hashed (never
-// stored or compared in plaintext), and none of your teams/games/settings
-// load until login succeeds — but someone with real technical intent and
-// browser dev-tools access to this same artifact could still bypass it.
-// True server-enforced security would need an actual backend.
-//
-// The credential record is stored the same way as everything else (cloud
-// when this runs as a Claude artifact, so it follows you across devices;
-// local fallback otherwise) under its own key, separate from app data.
+// AUTH — real email/password login via Supabase Auth. The password is
+// checked server-side; this page never sees or stores it itself. Supabase
+// keeps you signed in across reloads on the same browser (its own session
+// token in localStorage) — opening on a new device just asks you to log
+// in again with the same email/password, then loads the same data.
 // =====================================================================
-const AUTH_CLOUD_KEY = "auth";
-const AUTH_LOCAL_KEY = "cbb_totals_model_auth_v1";
-
-async function loadAuthRecord() {
-  if (usingCloudStorage) {
-    try {
-      const result = await window.storage.get(AUTH_CLOUD_KEY, false);
-      return (result && result.value) ? JSON.parse(result.value) : null;
-    } catch (e) {
-      return null;
-    }
-  }
-  try {
-    const raw = localStorage.getItem(AUTH_LOCAL_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
+// Supabase Auth is built around email addresses, but the login screen only
+// ever shows/asks for a plain username. This deterministically maps a
+// username to a fixed, never-emailed address so Supabase has something
+// email-shaped to store, without the person ever seeing or typing one.
+function usernameToEmail(username) {
+  const clean = username.trim().toLowerCase().replace(/\s+/g, "");
+  return clean + "@bradystotalmodel.local.invalid";
 }
 
-async function saveAuthRecord(record) {
-  const payload = JSON.stringify(record);
-  if (usingCloudStorage) {
-    try { await window.storage.set(AUTH_CLOUD_KEY, payload, false); } catch (e) {}
-    return;
-  }
-  try { localStorage.setItem(AUTH_LOCAL_KEY, payload); } catch (e) {}
-}
-
-function generateSalt() {
-  const arr = new Uint8Array(16);
-  crypto.getRandomValues(arr);
-  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256Hex(str) {
-  const enc = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-function hashPassword(password, salt) {
-  return sha256Hex(salt + ":" + password);
-}
-
-// Shows the overlay in setup or login mode and resolves once the person is
-// authenticated. Nothing in the rest of init() runs until this resolves —
-// that's what keeps app data from loading before login succeeds.
 function authenticate() {
   return new Promise((resolve) => {
     (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session && session.user) {
+        currentUserId = session.user.id;
+        resolve();
+        return;
+      }
+
       const overlay = document.getElementById("authOverlay");
       overlay.classList.add("show");
-      const existing = await loadAuthRecord();
 
-      const submitOnEnter = (input, btn) => {
-        input.addEventListener("keydown", (e) => { if (e.key === "Enter") btn.click(); });
+      let mode = "login"; // or "signup"
+      const tabLogin = document.getElementById("authTabLogin");
+      const tabSignup = document.getElementById("authTabSignup");
+      const sub = document.getElementById("authFormSub");
+      const emailEl = document.getElementById("authEmail");
+      const pwEl = document.getElementById("authPassword");
+      const pw2Field = document.getElementById("authPassword2Field");
+      const pw2El = document.getElementById("authPassword2");
+      const submitBtn = document.getElementById("authSubmitBtn");
+      const errEl = document.getElementById("authFormError");
+      const noteEl = document.getElementById("authFormNote");
+
+      const setMode = (m) => {
+        mode = m;
+        errEl.textContent = "";
+        noteEl.textContent = "";
+        tabLogin.classList.toggle("active", m === "login");
+        tabSignup.classList.toggle("active", m === "signup");
+        pw2Field.style.display = m === "signup" ? "block" : "none";
+        sub.textContent = m === "login"
+          ? "Log in to load your data on this device."
+          : "Create an account — this is what you'll use to log in from any device.";
+        submitBtn.textContent = m === "login" ? "Log In" : "Create Account";
       };
+      tabLogin.addEventListener("click", () => setMode("login"));
+      tabSignup.addEventListener("click", () => setMode("signup"));
+      setMode("login");
 
-      if (!existing) {
-        document.getElementById("authSetupForm").style.display = "block";
-        const btn = document.getElementById("authSetupBtn");
-        const uEl = document.getElementById("authNewUsername");
-        const pEl = document.getElementById("authNewPassword");
-        const p2El = document.getElementById("authNewPassword2");
-        const errEl = document.getElementById("authSetupError");
-        const submit = async () => {
-          const username = uEl.value.trim();
-          const pw = pEl.value;
-          const pw2 = p2El.value;
-          if (!username || !pw) { errEl.textContent = "Enter a username and password."; return; }
+      const submit = async () => {
+        errEl.textContent = "";
+        noteEl.textContent = "";
+        const username = emailEl.value.trim();
+        const email = usernameToEmail(username);
+        const pw = pwEl.value;
+        if (!username || !pw) { errEl.textContent = "Enter a username and password."; return; }
+
+        if (mode === "signup") {
+          const pw2 = pw2El.value;
+          if (pw.length < 6) { errEl.textContent = "Password should be at least 6 characters."; return; }
           if (pw !== pw2) { errEl.textContent = "Passwords do not match."; return; }
-          if (pw.length < 4) { errEl.textContent = "Password should be at least 4 characters."; return; }
-          const salt = generateSalt();
-          const hash = await hashPassword(pw, salt);
-          await saveAuthRecord({ username, salt, hash });
-          overlay.classList.remove("show");
-          resolve();
-        };
-        btn.addEventListener("click", submit);
-        [uEl, pEl, p2El].forEach(el => submitOnEnter(el, btn));
-      } else {
-        document.getElementById("authLoginForm").style.display = "block";
-        const btn = document.getElementById("authLoginBtn");
-        const uEl = document.getElementById("authUsername");
-        const pEl = document.getElementById("authPassword");
-        const errEl = document.getElementById("authLoginError");
-        const submit = async () => {
-          const username = uEl.value.trim();
-          const pw = pEl.value;
-          const hash = await hashPassword(pw, existing.salt);
-          if (username === existing.username && hash === existing.hash) {
+          const { data, error } = await sb.auth.signUp({ email, password: pw });
+          if (error) { errEl.textContent = error.message; return; }
+          if (data.session && data.user) {
+            currentUserId = data.user.id;
             overlay.classList.remove("show");
             resolve();
           } else {
-            errEl.textContent = "Incorrect username or password.";
+            noteEl.textContent = "Account created. If login doesn't work right away, email confirmation may be turned on in Supabase for an address this username can't actually receive — turn off \"Confirm email\" under Authentication → Providers → Email, then try logging in again.";
+            setMode("login");
           }
-        };
-        btn.addEventListener("click", submit);
-        [uEl, pEl].forEach(el => submitOnEnter(el, btn));
-      }
+        } else {
+          const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+          if (error) { errEl.textContent = "Incorrect username or password."; return; }
+          currentUserId = data.user.id;
+          overlay.classList.remove("show");
+          resolve();
+        }
+      };
+      submitBtn.addEventListener("click", submit);
+      [emailEl, pwEl, pw2El].forEach(el => {
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+      });
     })();
   });
 }
 
 async function openChangePassword() {
-  const existing = await loadAuthRecord();
-  if (!existing) { showToast("No login set up yet"); return; }
-
-  document.getElementById("authSetupForm").style.display = "none";
-  document.getElementById("authLoginForm").style.display = "none";
+  if (!currentUserId) { showToast("Not logged in"); return; }
+  document.getElementById("authAuthForm").style.display = "none";
   const changeForm = document.getElementById("authChangeForm");
   changeForm.style.display = "block";
-  document.getElementById("authChangeUsername").value = existing.username;
-  document.getElementById("authChangeCurrent").value = "";
   document.getElementById("authChangeNew").value = "";
   document.getElementById("authChangeNew2").value = "";
   document.getElementById("authChangeError").textContent = "";
@@ -989,65 +956,61 @@ async function openChangePassword() {
   document.getElementById("authChangeCancelBtn").onclick = () => {
     document.getElementById("authOverlay").classList.remove("show");
     changeForm.style.display = "none";
+    document.getElementById("authAuthForm").style.display = "block";
   };
   document.getElementById("authChangeSaveBtn").onclick = async () => {
     const errEl = document.getElementById("authChangeError");
-    const current = document.getElementById("authChangeCurrent").value;
-    const newUsername = document.getElementById("authChangeUsername").value.trim();
     const newPw = document.getElementById("authChangeNew").value;
     const newPw2 = document.getElementById("authChangeNew2").value;
-    const currentHash = await hashPassword(current, existing.salt);
-    if (currentHash !== existing.hash) { errEl.textContent = "Current password is incorrect."; return; }
-    if (!newUsername || !newPw) { errEl.textContent = "Enter a username and new password."; return; }
-    if (newPw.length < 4) { errEl.textContent = "Password should be at least 4 characters."; return; }
+    if (newPw.length < 6) { errEl.textContent = "Password should be at least 6 characters."; return; }
     if (newPw !== newPw2) { errEl.textContent = "New passwords do not match."; return; }
-    const salt = generateSalt();
-    const hash = await hashPassword(newPw, salt);
-    await saveAuthRecord({ username: newUsername, salt, hash });
+    const { error } = await sb.auth.updateUser({ password: newPw });
+    if (error) { errEl.textContent = error.message; return; }
     document.getElementById("authOverlay").classList.remove("show");
     changeForm.style.display = "none";
-    showToast("Login updated");
+    document.getElementById("authAuthForm").style.display = "block";
+    showToast("Password updated");
   };
 }
 
 document.getElementById("changePasswordBtn").addEventListener("click", openChangePassword);
-document.getElementById("logoutBtn").addEventListener("click", () => location.reload());
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
 
-function testStorageAvailable() {
-  try {
-    const t = "__cbb_test__";
-    localStorage.setItem(t, "1");
-    localStorage.removeItem(t);
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
+// =====================================================================
+// PERSISTENCE — your data lives in the `app_state` table, one row per
+// user (row-level security keeps everyone's row private). Writes are
+// debounced so rapid edits (typing, dragging) don't fire a network
+// request per keystroke; they settle ~700ms after you stop.
+// =====================================================================
 function currentSnapshot() {
   return { teams, games, settings, history, statsRecords, autoCalcLg, autoSortResults, themeMode };
 }
 
-async function saveState() {
-  const payload = JSON.stringify(currentSnapshot());
-  if (usingCloudStorage) {
-    try {
-      const result = await window.storage.set(CLOUD_KEY, payload, false);
-      if (!result) showStorageBanner("Couldn't reach Claude's storage just now — your latest edit may not have saved. It'll retry on your next change.");
-      else hideStorageBanner();
-    } catch (e) {
-      showStorageBanner("Couldn't reach Claude's storage just now — your latest edit may not have saved. It'll retry on your next change.");
-    }
-    return;
-  }
-  if (!storageAvailable) return;
+let saveTimer = null;
+function saveState() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSaveState, 700);
+}
+
+async function flushSaveState() {
+  if (!currentUserId) return;
   try {
-    localStorage.setItem(STORAGE_KEY, payload);
+    const { error } = await sb.from("app_state").upsert(
+      { user_id: currentUserId, data: currentSnapshot(), updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    if (error) showStorageBanner("Couldn't sync to the server just now — your latest edit may not have saved. It'll retry on your next change.");
+    else hideStorageBanner();
   } catch (e) {
-    storageAvailable = false;
-    showStorageBanner("This browser is blocking local storage, so edits won't be remembered after you close this tab. Use Export All Data before closing if you want to keep them.");
+    showStorageBanner("Couldn't sync to the server just now — your latest edit may not have saved. It'll retry on your next change.");
   }
 }
+
+// Best-effort flush if the tab is closed mid-edit, before the debounce fires.
+window.addEventListener("beforeunload", () => { if (saveTimer) flushSaveState(); });
 
 function applySnapshot(data) {
   if (Array.isArray(data.teams) && data.teams.length) teams = data.teams;
@@ -1074,22 +1037,11 @@ function applySnapshot(data) {
 }
 
 async function loadState() {
-  if (usingCloudStorage) {
-    try {
-      const result = await window.storage.get(CLOUD_KEY, false);
-      if (!result || !result.value) return false;
-      applySnapshot(JSON.parse(result.value));
-      return true;
-    } catch (e) {
-      // No saved data yet for this account, or a transient error — either
-      // way, start from the sample data rather than blocking the page.
-      return false;
-    }
-  }
+  if (!currentUserId) return false;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    applySnapshot(JSON.parse(raw));
+    const { data, error } = await sb.from("app_state").select("data").eq("user_id", currentUserId).maybeSingle();
+    if (error || !data || !data.data) return false;
+    applySnapshot(data.data);
     return true;
   } catch (e) {
     return false;
@@ -1108,12 +1060,10 @@ function hideStorageBanner() {
   if (b) b.style.display = "none";
 }
 
-function clearSavedState() {
-  if (usingCloudStorage) {
-    window.storage.delete(CLOUD_KEY, false).catch(() => {}).finally(() => location.reload());
-    return;
+async function clearSavedState() {
+  if (currentUserId) {
+    try { await sb.from("app_state").delete().eq("user_id", currentUserId); } catch (e) {}
   }
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
   location.reload();
 }
 
@@ -2313,12 +2263,6 @@ document.getElementById("autoCalcLgToggle").addEventListener("change", (e) => {
   document.getElementById("dateFilterInput").value = selectedDate;
   document.getElementById("newDate").value = selectedDate;
 
-  if (!usingCloudStorage) {
-    storageAvailable = testStorageAvailable();
-    if (!storageAvailable) {
-      showStorageBanner("This browser is blocking local storage, so edits won't be remembered after you close this tab. Use Export All Data before closing if you want to keep them.");
-    }
-  }
   await loadState();
   applyTheme(themeMode); // re-apply now that the persisted choice (if any) is loaded
 
