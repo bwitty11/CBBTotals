@@ -2096,6 +2096,18 @@ document.getElementById("dateFilterInput").addEventListener("change", (e) => {
 // document or officially support this endpoint for outside use, so it
 // could stop working or get rate-limited without notice.
 // =====================================================================
+// ESPN team objects carry the mascot separately from the school name, but
+// Torvik-style naming (what the Team Stats tab uses) is school name only —
+// and abbreviates "State" to "St." (e.g. "Michigan St.", not "Michigan
+// State" and not "Michigan State Wolverines"). This gets ESPN's names
+// close enough to match without manual renaming for most schools.
+function normalizeEspnTeamName(team) {
+  if (!team) return "";
+  let name = team.location || team.shortDisplayName || team.displayName || team.name || "";
+  name = name.replace(/\bState\b/gi, "St.");
+  return name.trim();
+}
+
 async function fetchEspnScoreboard(dateIso) {
   const yyyymmdd = dateIso.replace(/-/g, "");
   // groups=50 asks for the full D-I slate, not just a handful of "top" games.
@@ -2119,8 +2131,8 @@ async function fetchEspnScoreboard(dateIso) {
     out.push({
       Date: dateIso,
       StartTime: startTime,
-      Home: home.team.displayName || home.team.name || home.team.shortDisplayName || "",
-      Away: away.team.displayName || away.team.name || away.team.shortDisplayName || ""
+      Home: normalizeEspnTeamName(home.team),
+      Away: normalizeEspnTeamName(away.team)
     });
   });
   return out;
@@ -2188,8 +2200,8 @@ async function fetchEspnFinalScores(dateIso) {
     const homeScore = parseInt(home.score, 10);
     const awayScore = parseInt(away.score, 10);
     out.push({
-      Home: home.team.displayName || home.team.name || "",
-      Away: away.team.displayName || away.team.name || "",
+      Home: normalizeEspnTeamName(home.team),
+      Away: normalizeEspnTeamName(away.team),
       completed,
       total: (completed && !isNaN(homeScore) && !isNaN(awayScore)) ? (homeScore + awayScore) : null
     });
