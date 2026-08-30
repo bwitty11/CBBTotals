@@ -606,7 +606,8 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Games</h2>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn primary small" id="fetchGamesBtn" title="Pull today's NCAA Men's D-I schedule from ESPN for the date shown above">Fetch Games (ESPN)</button>
           <label class="btn small" for="gamesCsvInput">Upload CSV</label>
           <input type="file" id="gamesCsvInput" accept=".csv">
           <button class="btn small" id="downloadGamesBtn">Download CSV</button>
@@ -614,16 +615,17 @@
         </div>
       </div>
       <div class="sub" style="margin-bottom:10px; color:var(--dim);">
-        Columns: Date, Home, Away, MarketTotal — team names must match the Team Stats table (not case-sensitive)
+        Columns: Date, StartTime, Home, Away, MarketTotal — team names must match the Team Stats table (not case-sensitive)
       </div>
       <div class="table-scroll">
         <table id="gamesTable">
-          <thead><tr><th>Date</th><th>Home</th><th>Away</th><th>Market Total</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Start Time</th><th>Home</th><th>Away</th><th>Market Total</th><th></th></tr></thead>
           <tbody id="gamesBody"></tbody>
         </table>
       </div>
       <div class="add-row-form">
         <div class="field"><label>Date</label><input type="text" id="newDate" placeholder="2026-01-15"></div>
+        <div class="field"><label>Start Time</label><input type="text" id="newStartTime" placeholder="7:00 PM"></div>
         <div class="field"><label>Home</label><input type="text" id="newHome" list="teamNames" placeholder="Home team"></div>
         <div class="field"><label>Away</label><input type="text" id="newAway" list="teamNames" placeholder="Away team"></div>
         <div class="field"><label>Market Total</label><input type="number" step="any" inputmode="decimal" id="newMarket" placeholder="152.5"></div>
@@ -667,7 +669,8 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Backtest Log</h2>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn primary small" id="fetchScoresBtn" title="Fills in Actual Total for logged games that have gone final, using ESPN's final scores">Fetch Final Scores (ESPN)</button>
           <button class="btn small" id="downloadHistoryBtn">Download History CSV</button>
           <button class="btn small" id="applyStdDevBtn" title="Sets Settings → Std Dev of Model Error from the completed games below">Apply Std Dev to Settings</button>
           <button class="btn small" id="clearStatsBtn" title="Resets the stats dashboard (Completed Games / Mean Error / Std Dev / Hit Rate) and clears Actual Total on logged games">Clear Stats</button>
@@ -1396,6 +1399,7 @@ function renderGamesTable() {
     };
 
     tr.appendChild(mk("Date", "text"));
+    tr.appendChild(mk("StartTime", "text"));
     tr.appendChild(mk("Home", "text", "teamNames"));
     tr.appendChild(mk("Away", "text", "teamNames"));
     tr.appendChild(mk("MarketTotal", "number"));
@@ -1414,7 +1418,7 @@ function renderGamesTable() {
   });
 
   if (shown === 0) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-msg">No games logged for ${formatDateLabel(selectedDate)}. Add one below.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty-msg">No games logged for ${formatDateLabel(selectedDate)}. Add one below or fetch today's schedule.</td></tr>`;
   }
 
   updateDateFilterLabel(shown);
@@ -1893,13 +1897,23 @@ document.getElementById("gamesCsvInput").addEventListener("change", (e) => {
     rows.forEach(r => {
       const g = {
         Date: r.Date || r.date || "",
+        StartTime: r.StartTime || r.startTime || r.start_time || "",
         Home: r.Home || r.home || "",
         Away: r.Away || r.away || "",
-        MarketTotal: parseFloat(r.MarketTotal || r.marketTotal || r.market_total) || ""
+        MarketTotal: parseFloat(r.MarketTotal || r.marketTotal || r.market_total)
       };
       const key = gameKey(g);
       const idx = games.findIndex(existing => gameKey(existing) === key);
-      if (idx >= 0) { games[idx] = g; updated++; } else { games.push(g); added++; }
+      if (idx >= 0) {
+        // Keep an existing Market Total unless the CSV row actually provides one.
+        const preserved = isNaN(g.MarketTotal) ? games[idx].MarketTotal : g.MarketTotal;
+        games[idx] = Object.assign({}, games[idx], g, { MarketTotal: preserved });
+        updated++;
+      } else {
+        if (isNaN(g.MarketTotal)) g.MarketTotal = "";
+        games.push(g);
+        added++;
+      }
     });
     renderGamesTable();
     recompute();
@@ -1935,12 +1949,13 @@ document.getElementById("clearGamesBtn").addEventListener("click", async () => {
 
 document.getElementById("addGameBtn").addEventListener("click", () => {
   const date = document.getElementById("newDate").value.trim() || selectedDate;
+  const startTime = document.getElementById("newStartTime").value.trim();
   const home = document.getElementById("newHome").value.trim();
   const away = document.getElementById("newAway").value.trim();
   const market = document.getElementById("newMarket").value.trim();
   if (!home || !away) { showToast("Enter a home and away team"); return; }
-  games.push({ Date: date, Home: home, Away: away, MarketTotal: market === "" ? "" : parseFloat(market) });
-  ["newHome","newAway","newMarket"].forEach(id => document.getElementById(id).value = "");
+  games.push({ Date: date, StartTime: startTime, Home: home, Away: away, MarketTotal: market === "" ? "" : parseFloat(market) });
+  ["newStartTime","newHome","newAway","newMarket"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("newDate").value = selectedDate; // reset to the date currently being viewed
   renderGamesTable();
   recompute();
@@ -1950,7 +1965,7 @@ document.getElementById("downloadTeamsBtn").addEventListener("click", () => {
   downloadCSV("team_stats.csv", toCSV(teams, TEAM_FIELDS));
 });
 document.getElementById("downloadGamesBtn").addEventListener("click", () => {
-  downloadCSV("games.csv", toCSV(games, ["Date","Home","Away","MarketTotal"]));
+  downloadCSV("games.csv", toCSV(games, ["Date","StartTime","Home","Away","MarketTotal"]));
 });
 document.getElementById("downloadResultsBtn").addEventListener("click", () => {
   if (lastResults.length === 0) { showToast("No results to export yet"); return; }
@@ -2069,6 +2084,155 @@ document.getElementById("dateTodayBtn").addEventListener("click", () => setSelec
 document.getElementById("dateTomorrowBtn").addEventListener("click", () => setSelectedDate(tomorrowISO()));
 document.getElementById("dateFilterInput").addEventListener("change", (e) => {
   if (e.target.value) setSelectedDate(e.target.value);
+});
+
+// =====================================================================
+// FETCH GAMES (ESPN) — pulls the NCAA Men's D-I schedule for the selected
+// date from ESPN's public (unofficial) scoreboard feed and merges it into
+// `games`, keyed by Date+Home+Away so re-fetching never creates
+// duplicates and never overwrites a Market Total you've already entered.
+// This is on-demand only (you click the button) — there's no way for this
+// static page to run on a schedule with nobody watching. ESPN doesn't
+// document or officially support this endpoint for outside use, so it
+// could stop working or get rate-limited without notice.
+// =====================================================================
+async function fetchEspnScoreboard(dateIso) {
+  const yyyymmdd = dateIso.replace(/-/g, "");
+  // groups=50 asks for the full D-I slate, not just a handful of "top" games.
+  const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${yyyymmdd}&groups=50&limit=500`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ESPN returned HTTP ${res.status}`);
+  const data = await res.json();
+  const events = Array.isArray(data.events) ? data.events : [];
+  const out = [];
+  events.forEach(ev => {
+    const comp = ev.competitions && ev.competitions[0];
+    if (!comp || !Array.isArray(comp.competitors)) return;
+    const home = comp.competitors.find(c => c.homeAway === "home");
+    const away = comp.competitors.find(c => c.homeAway === "away");
+    if (!home || !away || !home.team || !away.team) return;
+    let startTime = "";
+    const dt = new Date(ev.date || comp.date);
+    if (!isNaN(dt.getTime())) {
+      startTime = dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    }
+    out.push({
+      Date: dateIso,
+      StartTime: startTime,
+      Home: home.team.displayName || home.team.name || home.team.shortDisplayName || "",
+      Away: away.team.displayName || away.team.name || away.team.shortDisplayName || ""
+    });
+  });
+  return out;
+}
+
+document.getElementById("fetchGamesBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("fetchGamesBtn");
+  const originalLabel = btn.textContent;
+  btn.textContent = "Fetching…";
+  btn.disabled = true;
+  try {
+    const fetched = await fetchEspnScoreboard(selectedDate);
+    if (fetched.length === 0) {
+      showToast(`No NCAA Men's D-I games found on ESPN for ${formatDateLabel(selectedDate)}`);
+      return;
+    }
+    const gameKey = g => [g.Date, g.Home, g.Away].map(v => String(v || "").trim().toLowerCase()).join("|");
+    let added = 0, updated = 0;
+    fetched.forEach(g => {
+      const key = gameKey(g);
+      const idx = games.findIndex(existing => gameKey(existing) === key);
+      if (idx >= 0) {
+        // Keep whatever Market Total is already there — this only refreshes schedule info.
+        games[idx] = Object.assign({}, games[idx], { StartTime: g.StartTime, Home: g.Home, Away: g.Away });
+        updated++;
+      } else {
+        games.push(Object.assign({ MarketTotal: "" }, g));
+        added++;
+      }
+    });
+    renderGamesTable();
+    recompute();
+    showToast(`Fetched ${fetched.length} game(s) for ${formatDateLabel(selectedDate)} — ${added} new, ${updated} updated`);
+  } catch (err) {
+    showToast("Couldn't fetch from ESPN — it may be blocking this request. Try again, or add games manually.");
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
+});
+
+// =====================================================================
+// FETCH FINAL SCORES (ESPN) — for logged games still missing an Actual
+// Total, checks ESPN for a completed final score on that game's date and
+// fills it in automatically. Matches by Date+Home+Away, same as the
+// schedule fetch above. Manual editing of Actual Total (and Market Total)
+// in the table stays fully available — this only pre-fills it; a wrong
+// auto-filled number can still be typed over by hand.
+// =====================================================================
+async function fetchEspnFinalScores(dateIso) {
+  const yyyymmdd = dateIso.replace(/-/g, "");
+  const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${yyyymmdd}&groups=50&limit=500`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ESPN returned HTTP ${res.status}`);
+  const data = await res.json();
+  const events = Array.isArray(data.events) ? data.events : [];
+  const out = [];
+  events.forEach(ev => {
+    const comp = ev.competitions && ev.competitions[0];
+    if (!comp || !Array.isArray(comp.competitors)) return;
+    const home = comp.competitors.find(c => c.homeAway === "home");
+    const away = comp.competitors.find(c => c.homeAway === "away");
+    if (!home || !away || !home.team || !away.team) return;
+    const completed = !!(comp.status && comp.status.type && comp.status.type.completed);
+    const homeScore = parseInt(home.score, 10);
+    const awayScore = parseInt(away.score, 10);
+    out.push({
+      Home: home.team.displayName || home.team.name || "",
+      Away: away.team.displayName || away.team.name || "",
+      completed,
+      total: (completed && !isNaN(homeScore) && !isNaN(awayScore)) ? (homeScore + awayScore) : null
+    });
+  });
+  return out;
+}
+
+document.getElementById("fetchScoresBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("fetchScoresBtn");
+  const pending = history.filter(h => !isCompleted(h) && h.Date);
+  if (pending.length === 0) { showToast("No pending logged games with a date to check"); return; }
+
+  const dates = Array.from(new Set(pending.map(h => h.Date)));
+  const keyOf = (d, h, a) => [d, h, a].map(v => String(v || "").trim().toLowerCase()).join("|");
+  const originalLabel = btn.textContent;
+  btn.textContent = "Checking…";
+  btn.disabled = true;
+  try {
+    const scoreMap = {};
+    for (const d of dates) {
+      const scores = await fetchEspnFinalScores(d);
+      scores.forEach(s => { scoreMap[keyOf(d, s.Home, s.Away)] = s; });
+    }
+    let updated = 0;
+    pending.forEach(h => {
+      const s = scoreMap[keyOf(h.Date, h.Home, h.Away)];
+      if (s && s.completed && s.total !== null) {
+        h.ActualTotal = s.total;
+        syncStatsRecord(h);
+        updated++;
+      }
+    });
+    renderHistoryTable();
+    renderResultsLog();
+    saveState();
+    const remaining = pending.length - updated;
+    showToast(`Filled in ${updated} final score(s)${remaining > 0 ? ` — ${remaining} game(s) not final yet` : ""}`);
+  } catch (err) {
+    showToast("Couldn't fetch scores from ESPN — it may be blocking this request. Try again later.");
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
 });
 
 // =====================================================================
