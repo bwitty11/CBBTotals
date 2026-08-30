@@ -2097,14 +2097,53 @@ document.getElementById("dateFilterInput").addEventListener("change", (e) => {
 // could stop working or get rate-limited without notice.
 // =====================================================================
 // ESPN team objects carry the mascot separately from the school name, but
-// Torvik-style naming (what the Team Stats tab uses) is school name only —
-// and abbreviates "State" to "St." (e.g. "Michigan St.", not "Michigan
-// State" and not "Michigan State Wolverines"). This gets ESPN's names
-// close enough to match without manual renaming for most schools.
+// Torvik-style naming (what the Team Stats tab uses) is school name only,
+// abbreviates "State" to "St.", prefers spaces over hyphens, and drops
+// accents/special characters. Beyond those general rules, a handful of
+// schools just go by different short names between the two sources —
+// ESPN_NAME_ALIASES below is where those specific overrides live. Add to
+// it (lowercase key -> desired Torvik-style value) whenever a new mismatch
+// turns up.
+const ESPN_NAME_ALIASES = {
+  "kansas city": "UMKC",
+  "long island university": "LIU",
+  "long island": "LIU",
+  "american university": "American",
+  "grambling": "Grambling St.",
+  "california baptist": "Cal Baptist",
+  "loyola maryland": "Loyola MD",
+  "loyola (md)": "Loyola MD",
+  "ut martin": "Tennessee Martin",
+  "tennessee-martin": "Tennessee Martin",
+  "florida international": "FIU",
+  "sam houston": "Sam Houston St.",
+  "seattle u": "Seattle",
+  "queens university": "Queens",
+  "queens (nc)": "Queens",
+  "uic": "Illinois Chicago",
+  "pennsylvania": "Penn",
+  "omaha": "Nebraska Omaha",
+  "nc st.": "N.C. State",
+  "uconn": "Connecticut",
+  "app st.": "Appalachian St.",
+  "ualbany": "Albany"
+};
+
 function normalizeEspnTeamName(team) {
   if (!team) return "";
   let name = team.location || team.shortDisplayName || team.displayName || team.name || "";
+  // Strip accents (San José -> San Jose) and okina/apostrophe-style marks
+  // (Hawai'i / Hawaiʻi -> Hawaii).
+  name = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  name = name.replace(/['’ʻ]/g, "");
+  // Torvik prefers spaces over hyphens in compound school names
+  // (Gardner-Webb -> Gardner Webb, Bethune-Cookman -> Bethune Cookman).
+  name = name.replace(/-/g, " ").replace(/\s+/g, " ").trim();
+  // "State" -> "St." — applied before the alias table since a couple of
+  // alias entries key off this already-abbreviated form.
   name = name.replace(/\bState\b/gi, "St.");
+  const alias = ESPN_NAME_ALIASES[name.toLowerCase()];
+  if (alias) name = alias;
   return name.trim();
 }
 
