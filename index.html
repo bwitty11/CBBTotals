@@ -619,7 +619,11 @@
       </div>
       <div class="table-scroll">
         <table id="gamesTable">
-          <thead><tr><th>Date</th><th>Start Time</th><th>Home</th><th>Away</th><th>Market Total</th><th></th></tr></thead>
+          <thead><tr>
+            <th class="sortable" data-sort="Date">Date</th><th class="sortable" data-sort="StartTime">Start Time</th>
+            <th class="sortable" data-sort="Home">Home</th><th class="sortable" data-sort="Away">Away</th>
+            <th class="sortable" data-sort="MarketTotal">Market Total</th><th></th>
+          </tr></thead>
           <tbody id="gamesBody"></tbody>
         </table>
       </div>
@@ -1368,14 +1372,53 @@ function updateTeamNamesList() {
 // =====================================================================
 // RENDER: Games table
 // =====================================================================
+let gamesSortKey = null;
+let gamesSortDir = "asc";
+
+// Parses a Start Time display string like "7:00 PM" into minutes-past-
+// midnight for chronological sorting. Unparseable/blank/"TBD" values sort
+// to the end regardless of direction, rather than jumbling in based on
+// whatever text happens to be there.
+function parseStartTimeMinutes(str) {
+  const m = String(str || "").match(/(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+  if (!m) return null;
+  let hour = parseInt(m[1], 10) % 12;
+  const minute = parseInt(m[2], 10);
+  const ampm = (m[3] || "").toLowerCase();
+  if (ampm === "pm") hour += 12;
+  return hour * 60 + minute;
+}
+
 function renderGamesTable() {
   const body = document.getElementById("gamesBody");
   body.innerHTML = "";
-  let shown = 0;
 
-  games.forEach((g, rowIdx) => {
-    if (selectedDate && g.Date !== selectedDate) return;
-    shown++;
+  let rows = games.map((game, rowIdx) => ({ game, rowIdx }))
+    .filter(({ game }) => !selectedDate || game.Date === selectedDate);
+  const shown = rows.length;
+
+  if (gamesSortKey) {
+    rows = rows.slice().sort((a, b) => {
+      if (gamesSortKey === "StartTime") {
+        const av = parseStartTimeMinutes(a.game.StartTime);
+        const bv = parseStartTimeMinutes(b.game.StartTime);
+        if (av === null && bv === null) return 0;
+        if (av === null) return 1;  // unknown times always sort last
+        if (bv === null) return -1;
+        return (av - bv) * (gamesSortDir === "asc" ? 1 : -1);
+      }
+      if (gamesSortKey === "MarketTotal") {
+        const av = parseFloat(a.game.MarketTotal); const bv = parseFloat(b.game.MarketTotal);
+        const aNum = isNaN(av) ? -Infinity : av, bNum = isNaN(bv) ? -Infinity : bv;
+        return (aNum - bNum) * (gamesSortDir === "asc" ? 1 : -1);
+      }
+      const av = String(a.game[gamesSortKey] || "");
+      const bv = String(b.game[gamesSortKey] || "");
+      return av.localeCompare(bv) * (gamesSortDir === "asc" ? 1 : -1);
+    });
+  }
+
+  rows.forEach(({ game: g, rowIdx }) => {
     const tr = document.createElement("tr");
 
     const mk = (field, type, listAttr) => {
@@ -1422,7 +1465,21 @@ function renderGamesTable() {
   }
 
   updateDateFilterLabel(shown);
+
+  document.querySelectorAll('#gamesTable th[data-sort]').forEach(th => {
+    th.textContent = th.textContent.replace(/ [▲▼]$/, "");
+    if (th.dataset.sort === gamesSortKey) th.textContent += gamesSortDir === "asc" ? " ▲" : " ▼";
+  });
 }
+
+document.querySelectorAll('#gamesTable th[data-sort]').forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (gamesSortKey === key) gamesSortDir = gamesSortDir === "asc" ? "desc" : "asc";
+    else { gamesSortKey = key; gamesSortDir = "asc"; }
+    renderGamesTable();
+  });
+});
 
 // =====================================================================
 // RENDER: Results (recomputed live, this is the only thing that redraws
@@ -2136,7 +2193,13 @@ const ESPN_NAME_ALIASES = {
   "mount st. marys": "Mount St. Mary's",
   "ole miss": "Mississippi",
   "lsu new orleans": "New Orleans",
-  "nicholls": "Nicholls St."
+  "nicholls": "Nicholls St.",
+  "saint marys": "Saint Mary's",
+  "texas a&m corpus christi": "Texas A&M Corpus Chris",
+  "mcneese": "McNeese St.",
+  "iu indianapolis": "IU Indy",
+  "se louisiana": "Southeastern Louisiana",
+  "ul monroe": "Louisiana Monroe"
 };
 
 function normalizeEspnTeamName(team) {
@@ -2172,10 +2235,16 @@ async function fetchEspnScoreboard(dateIso) {
     const home = comp.competitors.find(c => c.homeAway === "home");
     const away = comp.competitors.find(c => c.homeAway === "away");
     if (!home || !away || !home.team || !away.team) return;
-    let startTime = "";
-    const dt = new Date(ev.date || comp.date);
-    if (!isNaN(dt.getTime())) {
-      startTime = dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    // ESPN marks games without a confirmed broadcast time by setting
+    // timeValid: false and defaulting the date field to a placeholder —
+    // which otherwise renders as a real-looking (but wrong) time. TBD is
+    // more honest than showing a fake 9:00 PM for those.
+    let startTime = "TBD";
+    if (ev.timeValid !== false) {
+      const dt = new Date(ev.date || comp.date);
+      if (!isNaN(dt.getTime())) {
+        startTime = dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      }
     }
     out.push({
       Date: dateIso,
