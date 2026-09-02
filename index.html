@@ -560,6 +560,30 @@
       </div>
       <div class="settings-grid" id="settingsGrid"></div>
     </section>
+
+    <details class="instructions">
+      <summary>Model Math</summary>
+      <div class="body">
+        <p><strong>Baseline (log5-style possession model):</strong><br>
+        Expected Tempo = (Home <code>AdjTempo</code> × Away <code>AdjTempo</code>) ÷ <code>League Avg Tempo</code><br>
+        Team's Expected Efficiency = (Team <code>AdjOE</code> × Opponent <code>AdjDE</code>) ÷ <code>League Avg Efficiency</code><br>
+        Team's Baseline Points = (Expected Tempo ÷ 100) × Team's Expected Efficiency</p>
+
+        <p><strong>Four Factors multiplier</strong> (applied per team, using the opponent's matching defensive number):<br>
+        For eFG%, ORB%, and FTR — each Expected Factor = (Team's Off factor × Opponent's Def factor) ÷ League Avg for that factor,
+        then Multiplier = (Expected Factor ÷ League Avg) <sup>Weight × Sensitivity</sup><br>
+        TOV% works in reverse (lower is better for the offense), so its multiplier uses (League Avg ÷ Expected Factor) <sup>Weight × Sensitivity</sup><br>
+        Four Factors Multiplier = eFG Multiplier × TOV Multiplier × ORB Multiplier × FTR Multiplier</p>
+
+        <p><strong>Final team points</strong> = Baseline Points × Four Factors Multiplier<br>
+        <strong>Model Total</strong> = Home Points + Away Points<br>
+        <strong>FF Adj</strong> = Model Total − (Home Baseline Points + Away Baseline Points) — how many points the Four Factors layer added or subtracted</p>
+
+        <p><strong>Edge</strong> = Model Total − Market Total<br>
+        <strong>Z-Score</strong> = Edge ÷ <code>Std Dev of Model Error</code><br>
+        <strong>Signal</strong> = Strong if |Edge| ≥ <code>Strong Threshold</code>, Lean if |Edge| ≥ <code>Lean Threshold</code>, otherwise No Edge — direction (Over/Under) follows the sign of Edge</p>
+      </div>
+    </details>
   </div>
 
   <div class="tab-panel" data-tab="teams">
